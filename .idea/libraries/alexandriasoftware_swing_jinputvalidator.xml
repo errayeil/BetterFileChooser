@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="alexandriasoftware.swing.jinputvalidator" type="repository">
+    <properties maven-id="com.alexandriasoftware.swing:jinputvalidator:0.9.0" />
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/alexandriasoftware/swing/jinputvalidator/0.9.0/jinputvalidator-0.9.0.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$MAVEN_REPOSITORY$/com/alexandriasoftware/swing/jinputvalidator/0.9.0/jinputvalidator-0.9.0-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES />
+  </library>
+</component>
