@@ -12,7 +12,7 @@ The goals of BetterFileChooser is to:
 - In the end with everything above included, a useful, fluid, and functional interface for the end-user.
 
 # Some API notes
-Besides the BetterFileChooser and BetterComponent's that are useable within the library, it also provides an API called Registry to register data to a store off-memory. Utilizing the Registry is how various variables remain consistent across instances of the UI. Currently, it only supports the built in components but I have plans to make it available and easy to use for anything else. Essentially, it'll end up plug and play. 
+Besides the BetterFileChooser and BetterComponent's that are useable within the library, it also provides an API called Registry to register data to a store off-memory. Utilizing the Registry is how various variables remain consistent across instances of the UI. Currently, it only supports the built in components but I have plans to make it available and easy to use for anything else. Essentially, it'll end up plug and play. It's basically a Preferences wrapper to store this data in an organized way.
 
 # Usage
 Using BetterFileChooser is as simple as using JFileChooser:
