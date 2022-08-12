@@ -1,7 +1,7 @@
 package com.github.errayeil.betterfilechooser.test;
 
 import com.formdev.flatlaf.FlatDarkLaf;
-import com.github.errayeil.betterfilechooser.ui.tree.Root.RootTree;
+import com.github.errayeil.betterfilechooser.ui.tree.Root.DriveRootTree;
 import io.codeworth.panelmatic.PanelMatic;
 
 import javax.swing.*;
@@ -22,13 +22,11 @@ public class Test {
 
 		JDialog dialog = new JDialog (  );
 		JPanel contentPane = new JPanel (  );
-		RootTree tree = new RootTree ( );
+		DriveRootTree tree = new DriveRootTree ( );
 		JButton button = new JButton ( "Change view" );
 
-		tree.setExpandable ( false );
-
 		button.addActionListener ( (a) -> {
-			tree.setViewMode ( RootTree.FOLDERS_AND_FILES );
+			tree.setViewMode ( DriveRootTree.FOLDERS_AND_FILES );
 		} );
 
 		PanelMatic.begin ( contentPane )
@@ -42,5 +40,7 @@ public class Test {
 
 		dialog.pack ();
 		dialog.setVisible ( true );
+
+		tree.setTopRootText ( "Testing" );
 	}
 }

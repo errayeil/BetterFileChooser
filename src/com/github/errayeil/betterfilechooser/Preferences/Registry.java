@@ -4,7 +4,7 @@ import com.github.errayeil.betterfilechooser.ui.Chooser.BetterFileChooser;
 import com.github.errayeil.betterfilechooser.ui.list.BetterList;
 import com.github.errayeil.betterfilechooser.ui.list.File.BetterFileList;
 import com.github.errayeil.betterfilechooser.ui.tree.BetterTree;
-import com.github.errayeil.betterfilechooser.ui.tree.Root.RootTree;
+import com.github.errayeil.betterfilechooser.ui.tree.Root.DriveRootTree;
 
 import java.security.InvalidParameterException;
 import java.util.ArrayList;
@@ -229,7 +229,7 @@ public final class Registry implements PreferenceChangeListener {
 			}
 
 			listListeners.add ( listenerToAdd );
-		} else if ( packageClass == RootTree.class ) {
+		} else if ( packageClass == DriveRootTree.class ) {
 			if ( treeListeners == null ) {
 				treeListeners = new ArrayList<> ( );
 			}
@@ -253,7 +253,7 @@ public final class Registry implements PreferenceChangeListener {
 			if ( listListeners != null ) {
 				listListeners.remove ( listenerToRemove );
 			}
-		} else if ( packageClass == RootTree.class ) {
+		} else if ( packageClass == DriveRootTree.class ) {
 			if ( treeListeners != null ) {
 				treeListeners.remove ( listenerToRemove );
 			}

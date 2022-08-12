@@ -21,9 +21,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.io.File;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 
 import static com.github.errayeil.betterfilechooser.Utils.BetterFileUtils.*;
@@ -40,7 +38,7 @@ import static javax.swing.filechooser.FileSystemView.getFileSystemView;
  * is not available for Java, yet. It'll probably end up being gif images.
  * @since 0.1
  */
-public class RootTree extends BetterTree {
+public class DriveRootTree extends BetterTree {
 
 	/**
 	 * Preferences wrapper class that stores data such was BetterFileChooser dialog location and
@@ -60,31 +58,48 @@ public class RootTree extends BetterTree {
 	private final List<BRTNode> driveNodesList;
 
 	/**
-	 * A map containing hidden files wrapped into their BRTNode Objects. <br>
-	 * The keys are the children nodes and the value is the parent node.
+	 * <p>
+	 * A map containing hidden files wrapped into their BRTNode Objects.
+	 * </p>
+	 * Key: Parent node
+	 * <br>
+	 * Value: List of child nodes.
 	 */
 	private final Map<BRTNode, List<BRTNode>> hiddenNodes;
 
 	/**
+	 * <p>
 	 * A map containing files that had a dollar sign in their path.
+	 * </p>
+	 * Key: Parent node
 	 * <br>
-	 * TODO: Eventually I'll add extra criteria to determine what should
+	 * Value: List of child nodes with dollar signs in the file path.
+	 *
+	 * @TODO: Eventually I'll add extra criteria to determine what should
 	 * and should not end up in this map, but for now it's to avoid a node
 	 * being created for the Recycling Bin since that throws a ton of exceptions.
 	 */
 	private final Map<BRTNode, List<BRTNode>> dsNodes;
 
 	/**
+	 * <p>
 	 * A Map of cached nodes. Cached nodes are BRTNodes that have
 	 * been removed from the RootTree because at the time they did
 	 * not qualify to be visible due to the view mode.
+	 * </p>
+	 * <br>
+	 * Key: Parent node
+	 * <br>
+	 * Value: List of child nodes
 	 */
 	private final Map<BRTNode, List<BRTNode>> cachedNodes;
 
 	/**
-	 *
+	 * A set of currently expanded paths. Any new path that is added
+	 * that has its parent path currently in this set will override
+	 * the parent path.
 	 */
-	private final List<TreePath> expandedPaths;
+	private final Set<TreePath> expandedPaths;
 
 	/**
 	 * The Tree model currently in use by the RootTree.
@@ -102,22 +117,6 @@ public class RootTree extends BetterTree {
 	private MouseListener popupListener;
 
 	/**
-	 * Integer codes to help determine the file view mode of the RootTree.
-	 */
-	public static int FOLDERS_ONLY = 0;
-	public static int FOLDERS_AND_FILES = 1;
-
-	/**
-	 * The integer code that determines the current view mode.
-	 */
-	private int viewMode;
-
-	/**
-	 * If hidden files/folders should be shown.
-	 */
-	private boolean showHidden;
-
-	/**
 	 * The currently selected node.
 	 */
 	private BRTNode selectedNode;
@@ -128,6 +127,16 @@ public class RootTree extends BetterTree {
 	 * Note: This can be null.
 	 */
 	private File selectedFile;
+
+	/**
+	 * The integer code that determines the current view mode.
+	 */
+	private int viewMode;
+
+	/**
+	 * If hidden files/folders should be shown.
+	 */
+	private boolean showHidden;
 
 	/**
 	 * Boolean flag to determine if a expansion events should be carried out.
@@ -142,14 +151,20 @@ public class RootTree extends BetterTree {
 	 */
 	private boolean unloadCollapsed = true;
 
+	/**
+	 * Integer codes to help determine the file view mode of the RootTree.
+	 */
+	public static int FOLDERS_ONLY = -1;
+	public static int FOLDERS_AND_FILES = 0;
+
 
 	/**
 	 * Constructs a RootTree with the default roots and sets the view mode and hidden file
 	 * visibility to the provided parameters.
 	 */
-	public RootTree ( ) {
-		this.viewMode = FOLDERS_ONLY; //registry.getTreeInt ( Keys.treeViewModeKey ); TODO: Default return value
-		this.showHidden = false; //registry.getTreeBoolean ( Keys.treeShowHiddenKey ); TODO: Default return value
+	public DriveRootTree ( ) {
+		this.viewMode = registry.getTreeInt ( Keys.treeViewModeKey );
+		this.showHidden = registry.getTreeBoolean ( Keys.treeShowHiddenKey );
 
 		topRootNode = new BRTNode ( new PCNodeObject ( "This PC" , getSystemFileIcon ( getDesktopFile ( ) ) ) );
 		currentModel = new DefaultTreeModel ( topRootNode );
@@ -157,7 +172,7 @@ public class RootTree extends BetterTree {
 		hiddenNodes = new HashMap<> ( );
 		dsNodes = new HashMap<> ( );
 		cachedNodes = new HashMap<> ( );
-		expandedPaths = new ArrayList<> ( );
+		expandedPaths = new HashSet<> ( );
 
 		BRTNode desktopNode = new BRTNode ( new FileNodeObject ( getDesktopFile ( ) , getSystemFileIcon ( getDesktopFile ( ) ) ) );
 		topRootNode.add ( desktopNode );
@@ -200,7 +215,7 @@ public class RootTree extends BetterTree {
 				}
 
 				if ( SwingUtilities.isLeftMouseButton ( e ) && e.getClickCount ( ) == 1 ) {
-					if ( expandable ) {
+					if ( DriveRootTree.this.expandable ) {
 						if ( path != null ) {
 							BRTNode node = ( BRTNode ) path.getLastPathComponent ( );
 							if ( node != null ) {
@@ -213,6 +228,8 @@ public class RootTree extends BetterTree {
 								}
 							}
 						}
+					} else {
+						//TODO log
 					}
 				}
 			}
@@ -225,7 +242,23 @@ public class RootTree extends BetterTree {
 		addTreeExpansionListener ( new TreeExpansionListener ( ) {
 			@Override
 			public void treeExpanded ( TreeExpansionEvent event ) {
-				expandedPaths.add ( event.getPath ( ) );
+				for ( int a = 0; a < getRowCount ( ) - 1; a++ ) {
+					TreePath currentPath = getPathForRow ( a );
+					TreePath nextPath = getPathForRow ( a + 1 );
+
+					if ( currentPath.isDescendant ( nextPath ) ) {
+						expandedPaths.add ( currentPath );
+					}
+				}
+
+				List<TreePath> toRemove = new ArrayList<> ( );
+				for ( TreePath p : expandedPaths ) {
+					if ( expandedPaths.contains ( p.getParentPath ( ) ) ) {
+						toRemove.add ( p.getParentPath ( ) );
+					}
+				}
+
+				toRemove.forEach ( expandedPaths::remove );
 			}
 
 			@Override
@@ -234,6 +267,8 @@ public class RootTree extends BetterTree {
 					BRTNode node = ( BRTNode ) event.getPath ( ).getLastPathComponent ( );
 					removeChildren ( node );
 				}
+
+				expandedPaths.remove ( event.getPath ( ) );
 			}
 		} );
 	}
@@ -307,8 +342,8 @@ public class RootTree extends BetterTree {
 						}
 					}
 				}
-				sortNodeList ( childNodes );
-				filterForViewMode ( parentNode , childNodes );
+				sortChildren ( childNodes );
+				filterChildren ( parentNode , childNodes );
 
 				return null;
 			}
@@ -337,7 +372,7 @@ public class RootTree extends BetterTree {
 	 * @TODO: Provide the ability to set custom sorters.
 	 * @since 0.1
 	 */
-	private synchronized void sortNodeList ( List<BRTNode> children ) {
+	private synchronized void sortChildren ( List<BRTNode> children ) {
 		children.sort ( ( ( Comparator<BRTNode> ) ( o1 , o2 ) -> {
 			File f1 = o1.getNodeObject ( ).getFile ( );
 			File f2 = o2.getNodeObject ( ).getFile ( );
@@ -378,7 +413,7 @@ public class RootTree extends BetterTree {
 	 * @version 0.1
 	 * @since 0.1
 	 */
-	private synchronized void filterForViewMode ( BRTNode parentNode , List<BRTNode> childNodes ) {
+	private synchronized void filterChildren ( BRTNode parentNode , List<BRTNode> childNodes ) {
 		List<BRTNode> toRemove = new ArrayList<> ( );
 		for ( BRTNode n : childNodes ) {
 			File f = n.getNodeObject ( ).getFile ( );
@@ -409,7 +444,7 @@ public class RootTree extends BetterTree {
 		 * Because of SwingWorker, I want to make sure this operates off the previous view mode
 		 * in the event filterForViewMode is called before the current worker completes.
 		 */
-		int localViewMode = viewMode;
+		final int localViewMode = viewMode;
 		SwingWorker worker = new SwingWorker ( ) {
 			final List<BRTNode> dsList = new ArrayList<> ( );
 			final List<BRTNode> hiddenList = new ArrayList<> ( );
@@ -464,11 +499,11 @@ public class RootTree extends BetterTree {
 		List<BRTNode> cached = cachedNodes.get ( selectedNode );
 		if ( cached != null ) {
 			children.addAll ( cached );
+			cachedNodes.remove ( selectedNode );
 		}
-		cachedNodes.clear ( );
 
-		sortNodeList ( children );
-		filterForViewMode ( selectedNode , children );
+		sortChildren ( children );
+		filterChildren ( selectedNode , children );
 
 		selectedNode.removeAllChildren ( );
 		for ( BRTNode n : children ) {
@@ -479,37 +514,47 @@ public class RootTree extends BetterTree {
 	}
 
 	/**
+	 * Updates all the unselected expanded paths.
 	 *
+	 * @TODO: Optimize and refactor. I think this is in a good spot right now but would love for some to chime in.
 	 */
-	private void updateUnselectedViewMode ( ) {
-		for ( TreePath p : expandedPaths ) {
-			List<BRTNode> children = new ArrayList<> ( );
+	private synchronized void updateUnselectedViewMode ( ) {
 
+		for ( TreePath p : expandedPaths ) {
+			System.out.println ( p );
 			for ( int i = 0; i < p.getPathCount ( ); i++ ) {
+				List<BRTNode> children = new ArrayList<> ( );
 				BRTNode n = ( BRTNode ) p.getPathComponent ( i );
 
-				if ( n.getChildCount ( ) > 0 ) {
-					List<BRTNode> cached = cachedNodes.get ( n );
-					if ( cached != null ) {
-						children.addAll ( cached );
+				if ( !( n.getNodeObject ( ) instanceof PCNodeObject ) ) {
+					if ( !( n.getNodeObject ( ) instanceof DriveNodeObject ) ) {
+						for ( int a = 0; a < n.getChildCount ( ); a++ ) {
+							children.add ( ( BRTNode ) n.getChildAt ( a ) );
+						}
+						List<BRTNode> cached = cachedNodes.get ( n );
+
+						if ( cached != null ) {
+							children.addAll ( cached );
+							cachedNodes.remove ( n );
+						}
+
+						sortChildren ( children );
+						filterChildren ( n , children );
+
+						for ( BRTNode cn : children ) {
+							if ( !n.isNodeChild ( cn ) ) {
+								n.add ( cn );
+							}
+						}
 					}
-
-					for ( int a = 0; a < n.getChildCount ( ); a++ ) {
-						children.add ( ( BRTNode ) n.getChildAt ( i ) );
-					}
-
-					sortNodeList ( children );
-					filterForViewMode ( n , children );
-
-					n.removeAllChildren ( );
-
-					for ( BRTNode child : children ) {
-						n.add ( child );
-					}
-
-					reloadAndExpand ( );
 				}
 			}
+		}
+
+		//Make sure to use an array here. Iterating through the set causes a ConcurrentModificationException
+		TreePath[] ps = expandedPaths.toArray ( TreePath[]::new );
+		for ( TreePath p : ps ) {
+			expandPath ( p );
 		}
 	}
 
@@ -612,6 +657,7 @@ public class RootTree extends BetterTree {
 	/**
 	 * Sets the text of the top node of the Tree.
 	 *
+	 * @apiNote Not currently working
 	 * @param text
 	 *
 	 * @version 0.1
@@ -620,15 +666,14 @@ public class RootTree extends BetterTree {
 	public void setTopRootText ( final String text ) {
 		topRootNode.setUserObject ( new PCNodeObject ( text , getSystemFileIcon ( getDesktopFile ( ) ) ) );
 
-		revalidate ();
-		repaint (  );
+		currentModel.nodeChanged ( topRootNode );
 	}
 
 	/**
 	 * Sets the icon for the top root node.
 	 *
 	 * @param icon
-	 *
+	 * @apiNote Not currently working
 	 * @version 0.1
 	 * @since 0.1
 	 */
@@ -640,7 +685,8 @@ public class RootTree extends BetterTree {
 
 	/**
 	 * Sets the view mode of the JTree.
-	 * The options are FOLDERS_ONLY , FILES_ONLY , FOLDERS_AND_FILES.
+	 * <br>
+	 * The options are FOLDERS_ONLY (-1) and FOLDERS_AND_FILES (0)..
 	 *
 	 * @param viewMode
 	 *
@@ -656,11 +702,17 @@ public class RootTree extends BetterTree {
 		if ( path != null ) {
 			BRTNode node = ( BRTNode ) path.getLastPathComponent ( );
 			if ( node != null ) {
-				updateSelectedViewmode ( node );
+				INodeObject obj = node.getNodeObject ( );
+
+				//Make sure the last path node isn't the root node.
+				if ( !( obj instanceof PCNodeObject ) ) {
+					updateSelectedViewmode ( node );
+				}
 			}
 		}
 
-		//updateUnselectedViewMode ( );
+		//Node we can do the unselected nodes.
+		updateUnselectedViewMode ( );
 	}
 
 	/**
