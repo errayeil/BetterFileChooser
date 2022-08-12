@@ -45,3 +45,8 @@ tree.setShowHidden ( true ); //Hidden files will now visible within the tree.
 tree.setViewMode ( BetterFileChooser.FOLDERS_AND_FILES ); //Both folders and files will be visible in the tree.
 tree.setUnloadOnCollapse ( true ); //Any collapsed nodes with children will have those children unloaded.
 ```
+
+# Dependencies
+Currently, BetterFileChooser makes use of these dependencies:
+- [JInputValidator](https://github.com/rhwood/jinputvalidator)
+- [PanelMatic](https://github.com/codeworth-gh/PanelMatic)
