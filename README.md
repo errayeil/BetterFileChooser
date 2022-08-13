@@ -14,6 +14,19 @@ The goals of BetterFileChooser is to:
 # Some API notes
 Besides the BetterFileChooser and BetterComponent's that are useable within the library, it also provides an API called Registry to register data to a store off-memory. Utilizing the Registry is how various variables remain consistent across instances of the UI. Currently, it only supports the built in components but I have plans to make it available and easy to use for anything else. Essentially, it'll end up plug and play. It's basically a Preferences wrapper to store this data in an organized way.
 
+# Current progress
+Right now BetterFileChooser is in a heavily incomplete state, with two UI components mostly completed. They can be used
+as is now with little bugs or issues, but I would recommend not utilizing this library in any of your projects until it is 
+mostly completed. The current task list is as follows:
+
+- [ ] Complete BetterFileList
+- [ ] Complete DriveRootTree
+- [ ] Complete FileChooserUI ( This one is pretty hefty, lots of misc. components to work on )
+- [ ] Complete BetterFileChooser
+
+One those four tasks are complete I will move onto integrating other components I have planned.
+
+
 # Usage
 Using BetterFileChooser is as simple as using JFileChooser:
 
