@@ -5,6 +5,8 @@ import com.github.errayeil.betterfilechooser.ui.tree.Root.DriveRootTree;
 import io.codeworth.panelmatic.PanelMatic;
 
 import javax.swing.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 /**
  * @author Errayeil
@@ -23,11 +25,22 @@ public class Test {
 		JDialog dialog = new JDialog (  );
 		JPanel contentPane = new JPanel (  );
 		DriveRootTree tree = new DriveRootTree ( );
-		JButton button = new JButton ( "Change view" );
+		JButton button = new JButton ( "HIT ME TO TEST MOTHER FUCKER" );
+		JPopupMenu menu = new JPopupMenu (  );
 
-		button.addActionListener ( (a) -> {
-			tree.setViewMode ( DriveRootTree.FOLDERS_AND_FILES );
-			tree.setShowHidden ( true );
+		menu.add ( new JMenuItem ( "Hello There." ) );
+		menu.add ( new JMenuItem ( "You were the chosen one, Anakin!" ) );
+		menu.add ( new JMenuItem ( "I HATE YOU!!!!" ) );
+		menu.add ( new JMenuItem ( "I loved you, you were my brother!" ) );
+		menu.add ( new JMenuItem ( "It goes something like that... I can't remember the lines exactly." ) );
+
+		tree.setComponentPopupMenu ( menu );
+
+		tree.setDoubleClickListener ( new MouseAdapter ( ) {
+			@Override
+			public void mousePressed ( MouseEvent e ) {
+				System.out.println ( "Ouch, that hurt!" );
+			}
 		} );
 
 		PanelMatic.begin ( contentPane )
@@ -42,6 +55,6 @@ public class Test {
 		dialog.pack ();
 		dialog.setVisible ( true );
 
-		tree.setTopRootText ( "testing" );
+
 	}
 }

@@ -14,7 +14,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.event.TreeExpansionEvent;
 import javax.swing.event.TreeExpansionListener;
-import javax.swing.filechooser.FileSystemView;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 import java.awt.MouseInfo;
@@ -27,7 +26,6 @@ import java.nio.file.Path;
 import java.util.*;
 
 import static com.github.errayeil.betterfilechooser.Utils.BetterFileUtils.*;
-import static javax.swing.filechooser.FileSystemView.getFileSystemView;
 
 /**
  * Creates a system storage drive root tree. Currently, this will only show folders and automatically does not show
@@ -151,11 +149,17 @@ public class DriveRootTree extends BetterTree {
 	private int toggleClickCount = 1;
 
 	/**
-	 * Boolean flag to determine if a expansion events should be carried out.
+	 * Boolean flag to determine if the desktop path should be displayed in the tree.
+	 * By default, this is false.
+	 */
+	private boolean showDesktopFolder = false;
+
+	/**
+	 * Boolean flag to determine if an expansion events should be carried out.
 	 * If set to false, this essentially makes the RootTree as a shortcut medium
 	 * for the storage drives. This is by default set to true.
 	 */
-	private boolean expandable = true;
+	private boolean allowExpansion = true;
 
 	/**
 	 * Boolean flag to determine if a nodes children should be removed when
@@ -167,10 +171,12 @@ public class DriveRootTree extends BetterTree {
 	 * Boolean flag to determine if there is no TreePopup currently assigned that if
 	 * right clicks should select the path just like left clicks would.
 	 */
-	private boolean rightClickSelects = false;
+	private boolean rightClickSelect = false;
 
 	/**
 	 * Integer codes to help determine the file view mode of the RootTree.
+	 * This will be moved from this class to BetterFileChooser, as the integer codes
+	 * will be the same.
 	 */
 	public static int FOLDERS_ONLY = -1;
 	public static int FOLDERS_AND_FILES = 0;
@@ -183,6 +189,7 @@ public class DriveRootTree extends BetterTree {
 	public DriveRootTree ( ) {
 		this.viewMode = -1; //registry.getTreeInt ( Keys.treeViewModeKey );
 		this.showHidden = false; //registry.getTreeBoolean ( Keys.treeShowHiddenKey );
+		this.showDesktopFolder = false ;//registry.getTreeBoolean ( Keys.rTreeShowDesktopKey );
 
 		topRootNode = new BRTNode ( new PCNodeObject ( "This PC" , getSystemFileIcon ( getDesktopFile ( ) ) ) );
 		currentModel = new DefaultTreeModel ( topRootNode );
@@ -192,19 +199,22 @@ public class DriveRootTree extends BetterTree {
 		cachedNodes = new HashMap<> ( );
 		expandedPaths = new HashSet<> ( );
 
-		BRTNode desktopNode = new BRTNode ( new FileNodeObject ( getDesktopFile ( ) , getSystemFileIcon ( getDesktopFile ( ) ) ) );
-		topRootNode.add ( desktopNode );
-
-		List<Path> rootsList = new ArrayList<> ( listDeviceRoots ( ) );
-		for ( Path p : rootsList ) {
+		for ( Path p : listDeviceRoots ( ) ) {
 			File f = p.toFile ( );
 
 			DriveNodeObject dn = new DriveNodeObject ( f , getSystemDisplayName ( f ) , getSystemFileIcon ( f ) );
-			BRTNode driveNode = new BRTNode ( dn );
-			driveNodesList.add ( driveNode );
-			topRootNode.add ( driveNode );
+			driveNodesList.add ( new BRTNode ( dn ) );
 		}
 
+		if ( showDesktopFolder ) {
+			topRootNode.add ( new BRTNode ( new FileNodeObject ( getDesktopFile ( ) , getSystemFileIcon ( getDesktopFile ( ) ) ) ) );
+		}
+
+		for ( BRTNode n : driveNodesList ) {
+			topRootNode.add ( n );
+		}
+
+		setToggleClickCount ( 0 );
 		setupListeners ( );
 		setEditable ( false );
 		setShowsRootHandles ( false );
@@ -226,13 +236,20 @@ public class DriveRootTree extends BetterTree {
 			public void mousePressed ( MouseEvent e ) {
 				TreePath path = getPathForLocation ( e.getX ( ) , e.getY ( ) );
 
-				if (SwingUtilities.isLeftMouseButton ( e )) {
+				if ( SwingUtilities.isLeftMouseButton ( e ) ) {
 					if ( path != null ) {
 						setSelectionPath ( path );
 					}
 
-					if ( e.getClickCount ( ) == 1 ) {
-						if ( DriveRootTree.this.expandable ) {
+					//TODO: Need to come up with some way to avoid executing single click code
+					if ( e.getClickCount ( ) == 2 ) {
+						if ( doubleClickListener != null ) {
+							fireDoubleClickEvent ( );
+						}
+						return;
+					}
+					if ( e.getClickCount ( ) == 1  ) {
+						if ( DriveRootTree.this.allowExpansion ) {
 							if ( path != null ) {
 								BRTNode node = ( BRTNode ) path.getLastPathComponent ( );
 								if ( node != null ) {
@@ -245,19 +262,15 @@ public class DriveRootTree extends BetterTree {
 									}
 								}
 							}
-						} else if ( e.getClickCount ( ) == 2 ) {
-							if ( doubleClickListener != null ) {
-								fireDoubleClickEvent ( );
-							}
 						}
 					}
 				} else if ( SwingUtilities.isRightMouseButton ( e ) ) {
-					if (treePopup != null ) {
+					if ( treePopup != null ) {
 						if ( path != null ) {
 							setSelectionPath ( path );
 						}
 					} else {
-						if ( rightClickSelects ) {
+						if ( rightClickSelect ) {
 							if ( path != null ) {
 								setSelectionPath ( path );
 							}
@@ -656,6 +669,31 @@ public class DriveRootTree extends BetterTree {
 	}
 
 	/**
+	 *
+	 * @return
+	 */
+	@Override
+	public JPopupMenu getComponentPopupMenu ( ) {
+		return getTreePopup ();
+	}
+
+	/**
+	 *
+	 * @return
+	 */
+	public MouseListener getDoubleClickListener ( ) {
+		return doubleClickListener;
+	}
+
+	/**
+	 *
+	 * @return
+	 */
+	public JPopupMenu getTreePopup ( ) {
+		return treePopup;
+	}
+
+	/**
 	 * Returns the selected file in the RootTree.
 	 * <br>
 	 * There's a possibility this could return null in the event the selected Tree node does
@@ -671,6 +709,14 @@ public class DriveRootTree extends BetterTree {
 	}
 
 	/**
+	 *
+	 * @return
+	 */
+	public int getCurrentViewMode( ) {
+		return viewMode;
+	}
+
+	/**
 	 * Returns if this RootTree nodes can be expanded.
 	 *
 	 * @return
@@ -678,8 +724,8 @@ public class DriveRootTree extends BetterTree {
 	 * @version 0.1
 	 * @since 0.1
 	 */
-	public boolean isExpandable ( ) {
-		return expandable;
+	public boolean isAllowExpansion ( ) {
+		return allowExpansion;
 	}
 
 	/**
@@ -693,6 +739,30 @@ public class DriveRootTree extends BetterTree {
 	 */
 	public boolean isUnloadingOnCollapse ( ) {
 		return unloadCollapsed;
+	}
+
+	/**
+	 *
+	 * @return
+	 */
+	public boolean isShowingHidden ( ) {
+		return showHidden;
+	}
+
+	/**
+	 *
+	 * @return
+	 */
+	public boolean isRightClickSelectEnabled ( ) {
+		return rightClickSelect;
+	}
+
+	/**
+	 *
+	 * @return
+	 */
+	public boolean isShowingDesktopFolder ( ) {
+		return showDesktopFolder;
 	}
 
 	/**
@@ -780,7 +850,7 @@ public class DriveRootTree extends BetterTree {
 	 * @since 0.1
 	 */
 	public void setTopRootText ( final String text ) {
-		BRTNode node = (BRTNode ) currentModel.getRoot ( );
+		BRTNode node = ( BRTNode ) currentModel.getRoot ( );
 		node.setUserObject ( new PCNodeObject ( text , getSystemFileIcon ( getDesktopFile ( ) ) ) );
 
 		currentModel.reload ( node );
@@ -834,6 +904,29 @@ public class DriveRootTree extends BetterTree {
 	}
 
 	/**
+	 * Sets if the desktop folder should be visible.
+	 *
+	 * @param showDesktop
+	 */
+	public void setShowDesktopFolder ( boolean showDesktop ) {
+		this.showDesktopFolder = showDesktop;
+		registry.addTreeBoolean ( Keys.rTreeShowDesktopKey , showDesktop );
+
+		if ( showDesktop ) {
+			BRTNode node = ( BRTNode ) topRootNode.getChildAt ( 0 );
+
+			if ( !node.getNodeObject ( ).getText ( ).equals ( "Desktop" ) ) {
+				topRootNode.insert ( new BRTNode ( new FileNodeObject ( getDesktopFile ( ) , getSystemFileIcon ( getDesktopFile ( ) ) ) ) , 0 );
+			}
+
+		} else {
+			topRootNode.remove ( 0 );
+		}
+
+		currentModel.reload ( topRootNode );
+	}
+
+	/**
 	 * <p>
 	 * Sets if the trees nodes can be expanded. If collapseNow is set to true, all
 	 * currently expanded paths will be collapsed and if unloadCollapsed is set to true
@@ -848,7 +941,7 @@ public class DriveRootTree extends BetterTree {
 	 * @param collapseNow if all the currently expanded nodes should be collapsed.
 	 */
 	public void setExpandable ( boolean expandable , boolean collapseNow ) {
-		this.expandable = expandable;
+		this.allowExpansion = expandable;
 
 		if ( collapseNow ) {
 			for ( TreePath p : expandedPaths ) {
@@ -865,6 +958,7 @@ public class DriveRootTree extends BetterTree {
 	 * <p>
 	 * No cache maps will be cleared.
 	 * </p>
+	 *
 	 * @param unload If nodes that are collapsed should have their children removed.
 	 */
 	public void setUnloadOnCollapse ( boolean unload ) {
@@ -875,10 +969,11 @@ public class DriveRootTree extends BetterTree {
 	 * Sets if right click events should select paths just like left clicks in the
 	 * event the tree popup menu has not been assigned. If the menu has been assigned, right
 	 * click selecting paths is the default behavior.
+	 *
 	 * @param selects
 	 */
-	public void setRightClickSelects ( boolean selects ) {
-		this.rightClickSelects = selects;
+	public void setRightClickSelect ( boolean selects ) {
+		this.rightClickSelect = selects;
 	}
 }
 
