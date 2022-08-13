@@ -50,3 +50,9 @@ tree.setUnloadOnCollapse ( true ); //Any collapsed nodes with children will have
 Currently, BetterFileChooser makes use of these dependencies:
 - [JInputValidator](https://github.com/rhwood/jinputvalidator)
 - [PanelMatic](https://github.com/codeworth-gh/PanelMatic)
+
+# Other notes
+This is a hobby project of mine, and I actually do this for fun. I don't do this as a profession. With that said, as I
+am not experienced and did not go to school for this, there may be some things that are questionable or do not make sense. 
+If you notice anything, please feel free to reach out and share what you've noticed. I'm doing this to learn more and I 
+don't always notice my mistakes. In any case, if you find this library useful or inspirational I'd love to hear about it. :)
