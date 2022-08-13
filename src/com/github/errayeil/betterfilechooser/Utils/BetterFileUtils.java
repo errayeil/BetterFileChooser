@@ -20,20 +20,21 @@ public class BetterFileUtils {
 	/**
 	 *
 	 */
-	private BetterFileUtils () {
+	private BetterFileUtils ( ) {
 
 	}
 
 	/**
-	 * Gets an array of all the drives connected to the users' device.
+	 * Gets an list of all the drives connected to the users' device.
 	 * <br>
 	 * This will include any type of drive plugged in via USB.
+	 *
 	 * @return
 	 */
-	public static List<Path> listDeviceRoots() {
-		FileSystem system = FileSystems.getDefault ();
-		Iterator<Path> it = system.getRootDirectories ().iterator ();
-		List<Path> roots = new ArrayList<> (  );
+	public static List<Path> listDeviceRoots ( ) {
+		FileSystem system = FileSystems.getDefault ( );
+		Iterator<Path> it = system.getRootDirectories ( ).iterator ( );
+		List<Path> roots = new ArrayList<> ( );
 		it.forEachRemaining ( roots::add );
 
 		return roots;
@@ -41,6 +42,7 @@ public class BetterFileUtils {
 
 	/**
 	 * Returns a file pointing to the user desktop file.
+	 *
 	 * @return
 	 */
 	public static File getDesktopFile ( ) {
@@ -49,6 +51,7 @@ public class BetterFileUtils {
 
 	/**
 	 * Returns a file pointing to the user documents folder.
+	 *
 	 * @return
 	 */
 	public static File getDocumentsFile ( ) {
@@ -57,14 +60,16 @@ public class BetterFileUtils {
 
 	/**
 	 * Returns a file pointing to the users downloads folder.
+	 *
 	 * @return
 	 */
-	public static File getDownloadsFile( ) {
-		return new File ( System.getProperty ( "user.home" ) + File.separator + "Downloads");
+	public static File getDownloadsFile ( ) {
+		return new File ( System.getProperty ( "user.home" ) + File.separator + "Downloads" );
 	}
 
 	/**
-	 *  Returns a file pointing to the user's music folder.
+	 * Returns a file pointing to the user's music folder.
+	 *
 	 * @return
 	 */
 	public static File getMusicFile ( ) {
@@ -73,6 +78,7 @@ public class BetterFileUtils {
 
 	/**
 	 * Returns a file pointing to the users Pictures folder.
+	 *
 	 * @return
 	 */
 	public static File getPicturesFile ( ) {
@@ -81,22 +87,20 @@ public class BetterFileUtils {
 
 	/**
 	 * Returns a file pointing to the users Videos folder.
+	 *
 	 * @return
 	 */
 	public static File getVideosFile ( ) {
 		return new File ( System.getProperty ( "user.home" ) + File.separator + "Videos" );
 	}
 
-
-
 	/**
-	 * Gets the file systems icon for the specified file.
+	 * @param path
 	 *
-	 * @param path The path of the file we need the icon for.
-	 * @return The files icon. This is system dependant.
+	 * @return
 	 */
-	public static Icon getSystemFileIcon (final String path ) {
-		return FileSystemView.getFileSystemView ( ).getSystemIcon ( new File ( path ));
+	public static String getSystemDisplayName ( final String path ) {
+		return FileSystemView.getFileSystemView ( ).getSystemDisplayName ( new File ( path ) );
 	}
 
 	/**
@@ -104,8 +108,28 @@ public class BetterFileUtils {
 	 * @param file
 	 * @return
 	 */
+	public static String getSystemDisplayName ( final File file ) {
+		return FileSystemView.getFileSystemView ( ).getSystemDisplayName ( file );
+	}
+
+	/**
+	 * Gets the file systems icon for the specified file.
+	 *
+	 * @param path The path of the file we need the icon for.
+	 *
+	 * @return The files icon. This is system dependant.
+	 */
+	public static Icon getSystemFileIcon ( final String path ) {
+		return FileSystemView.getFileSystemView ( ).getSystemIcon ( new File ( path ) );
+	}
+
+	/**
+	 * @param file
+	 *
+	 * @return
+	 */
 	public static Icon getSystemFileIcon ( final File file ) {
-		return FileSystemView.getFileSystemView ( ).getSystemIcon ( file);
+		return FileSystemView.getFileSystemView ( ).getSystemIcon ( file );
 	}
 
 }

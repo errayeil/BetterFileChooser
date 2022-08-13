@@ -3,11 +3,11 @@ package com.github.errayeil.betterfilechooser.ui.tree.Root;
 import com.github.errayeil.betterfilechooser.ui.tree.Root.Objects.INodeObject;
 import io.codeworth.panelmatic.PanelMatic;
 
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JTree;
+import javax.swing.*;
 import javax.swing.tree.DefaultTreeCellRenderer;
+import java.awt.Color;
 import java.awt.Component;
+import java.io.File;
 
 import static com.github.errayeil.betterfilechooser.Utils.BetterCompUtils.fill;
 
@@ -19,16 +19,6 @@ import static com.github.errayeil.betterfilechooser.Utils.BetterCompUtils.fill;
  */
 public class BRTCellRenderer extends DefaultTreeCellRenderer {
 
-	/**
-	 * The panel that contains the JLabel.
-	 * TODO: More components I have planned.
-	 */
-	private JPanel panel;
-
-	/**
-	 * The JLabel that displays the file name.
-	 */
-	private JLabel cellLabel;
 
 	/**
 	 *
@@ -50,11 +40,12 @@ public class BRTCellRenderer extends DefaultTreeCellRenderer {
 	 */
 	@Override
 	public Component getTreeCellRendererComponent ( JTree tree , Object value , boolean sel , boolean expanded , boolean leaf , int row , boolean hasFocus ) {
-		panel = new JPanel (  );
-		cellLabel = new JLabel ( );
+		JPanel panel = new JPanel (  );
+		JLabel cellLabel = new JLabel (  );
 
 		if ( value instanceof BRTNode node ) {
-			INodeObject no = node.getNodeObject ();
+			final INodeObject no = node.getNodeObject ();
+			File f = no.getFile ();
 
 			cellLabel.setText ( no.getText () );
 			cellLabel.setIcon ( no.getIcon () );
@@ -68,5 +59,14 @@ public class BRTCellRenderer extends DefaultTreeCellRenderer {
 				.get (  );
 
 		return panel;
+	}
+
+	/**
+	 * @param index
+	 *
+	 * @return
+	 */
+	public boolean isEvenRow ( int index ) {
+		return ( index & 1 ) == 0;
 	}
 }

@@ -17,6 +17,8 @@ import javax.swing.event.TreeExpansionListener;
 import javax.swing.filechooser.FileSystemView;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
+import java.awt.MouseInfo;
+import java.awt.Point;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
@@ -117,6 +119,11 @@ public class DriveRootTree extends BetterTree {
 	private MouseListener popupListener;
 
 	/**
+	 *
+	 */
+	private MouseListener doubleClickListener;
+
+	/**
 	 * The currently selected node.
 	 */
 	private BRTNode selectedNode;
@@ -139,6 +146,11 @@ public class DriveRootTree extends BetterTree {
 	private boolean showHidden;
 
 	/**
+	 * The click count needed to expand a selected path.
+	 */
+	private int toggleClickCount = 1;
+
+	/**
 	 * Boolean flag to determine if a expansion events should be carried out.
 	 * If set to false, this essentially makes the RootTree as a shortcut medium
 	 * for the storage drives. This is by default set to true.
@@ -152,6 +164,12 @@ public class DriveRootTree extends BetterTree {
 	private boolean unloadCollapsed = true;
 
 	/**
+	 * Boolean flag to determine if there is no TreePopup currently assigned that if
+	 * right clicks should select the path just like left clicks would.
+	 */
+	private boolean rightClickSelects = false;
+
+	/**
 	 * Integer codes to help determine the file view mode of the RootTree.
 	 */
 	public static int FOLDERS_ONLY = -1;
@@ -163,8 +181,8 @@ public class DriveRootTree extends BetterTree {
 	 * visibility to the provided parameters.
 	 */
 	public DriveRootTree ( ) {
-		this.viewMode = registry.getTreeInt ( Keys.treeViewModeKey );
-		this.showHidden = registry.getTreeBoolean ( Keys.treeShowHiddenKey );
+		this.viewMode = -1; //registry.getTreeInt ( Keys.treeViewModeKey );
+		this.showHidden = false; //registry.getTreeBoolean ( Keys.treeShowHiddenKey );
 
 		topRootNode = new BRTNode ( new PCNodeObject ( "This PC" , getSystemFileIcon ( getDesktopFile ( ) ) ) );
 		currentModel = new DefaultTreeModel ( topRootNode );
@@ -178,17 +196,15 @@ public class DriveRootTree extends BetterTree {
 		topRootNode.add ( desktopNode );
 
 		List<Path> rootsList = new ArrayList<> ( listDeviceRoots ( ) );
-		FileSystemView view = getFileSystemView ( );
 		for ( Path p : rootsList ) {
 			File f = p.toFile ( );
 
-			DriveNodeObject dn = new DriveNodeObject ( f , view.getSystemDisplayName ( f ) , getSystemFileIcon ( f ) );
+			DriveNodeObject dn = new DriveNodeObject ( f , getSystemDisplayName ( f ) , getSystemFileIcon ( f ) );
 			BRTNode driveNode = new BRTNode ( dn );
 			driveNodesList.add ( driveNode );
 			topRootNode.add ( driveNode );
 		}
 
-		setToggleClickCount ( 0 );
 		setupListeners ( );
 		setEditable ( false );
 		setShowsRootHandles ( false );
@@ -210,26 +226,42 @@ public class DriveRootTree extends BetterTree {
 			public void mousePressed ( MouseEvent e ) {
 				TreePath path = getPathForLocation ( e.getX ( ) , e.getY ( ) );
 
-				if ( path != null ) {
-					setSelectionPath ( path );
-				}
+				if (SwingUtilities.isLeftMouseButton ( e )) {
+					if ( path != null ) {
+						setSelectionPath ( path );
+					}
 
-				if ( SwingUtilities.isLeftMouseButton ( e ) && e.getClickCount ( ) == 1 ) {
-					if ( DriveRootTree.this.expandable ) {
-						if ( path != null ) {
-							BRTNode node = ( BRTNode ) path.getLastPathComponent ( );
-							if ( node != null ) {
-								INodeObject obj = node.getNodeObject ( );
+					if ( e.getClickCount ( ) == 1 ) {
+						if ( DriveRootTree.this.expandable ) {
+							if ( path != null ) {
+								BRTNode node = ( BRTNode ) path.getLastPathComponent ( );
+								if ( node != null ) {
+									INodeObject obj = node.getNodeObject ( );
 
-								if ( !( obj instanceof PCNodeObject ) ) {
-									selectedFile = node.getNodeObject ( ).getFile ( );
-									selectedNode = node;
-									createChildren ( node , selectedFile );
+									if ( !( obj instanceof PCNodeObject ) ) {
+										selectedFile = node.getNodeObject ( ).getFile ( );
+										selectedNode = node;
+										createChildren ( node , selectedFile );
+									}
 								}
 							}
+						} else if ( e.getClickCount ( ) == 2 ) {
+							if ( doubleClickListener != null ) {
+								fireDoubleClickEvent ( );
+							}
+						}
+					}
+				} else if ( SwingUtilities.isRightMouseButton ( e ) ) {
+					if (treePopup != null ) {
+						if ( path != null ) {
+							setSelectionPath ( path );
 						}
 					} else {
-						//TODO log
+						if ( rightClickSelects ) {
+							if ( path != null ) {
+								setSelectionPath ( path );
+							}
+						}
 					}
 				}
 			}
@@ -242,6 +274,16 @@ public class DriveRootTree extends BetterTree {
 		addTreeExpansionListener ( new TreeExpansionListener ( ) {
 			@Override
 			public void treeExpanded ( TreeExpansionEvent event ) {
+				/*
+				 * When a node expands we take some time to determine if that nodes TreePath
+				 * has already been added to the expandedPaths set. We do this to remove
+				 * potential duplicates. The Set will not allow duplicates inherently, however,
+				 * we want to avoid paths such as:
+				 * [ FolderA ]
+				 * [ FolderA , FolderB ]
+				 * If both were added it will cause some issues when the view mode is updated.
+				 * Since the second path is valid we'll remove the first one since we do not need it anymore.
+				 */
 				for ( int a = 0; a < getRowCount ( ) - 1; a++ ) {
 					TreePath currentPath = getPathForRow ( a );
 					TreePath nextPath = getPathForRow ( a + 1 );
@@ -268,6 +310,7 @@ public class DriveRootTree extends BetterTree {
 					removeChildren ( node );
 				}
 
+				//Remove the TreePath from the expandedPaths array, as it's no longer needed.
 				expandedPaths.remove ( event.getPath ( ) );
 			}
 		} );
@@ -319,6 +362,8 @@ public class DriveRootTree extends BetterTree {
 	}
 
 	/**
+	 * When a node is expanded createChildren is called to get files within the folder of the parent node.
+	 *
 	 * @param parentNode
 	 * @param directory
 	 *
@@ -366,8 +411,6 @@ public class DriveRootTree extends BetterTree {
 	 *
 	 * @param children
 	 *
-	 * @return
-	 *
 	 * @version 0.1
 	 * @TODO: Provide the ability to set custom sorters.
 	 * @since 0.1
@@ -376,7 +419,6 @@ public class DriveRootTree extends BetterTree {
 		children.sort ( ( ( Comparator<BRTNode> ) ( o1 , o2 ) -> {
 			File f1 = o1.getNodeObject ( ).getFile ( );
 			File f2 = o2.getNodeObject ( ).getFile ( );
-
 
 			if ( f1.isDirectory ( ) && f2.isFile ( ) ) {
 				return -1;
@@ -435,14 +477,18 @@ public class DriveRootTree extends BetterTree {
 			}
 		}
 
+		//Removes all the children nodes that did not meet the current criteria for the current view settings
 		childNodes.removeAll ( toRemove );
 
-		/**
-		 * I'm utilizing SwingWorker here because it seems like less of a headache
-		 * to use over Thread.
-		 * <br>
-		 * Because of SwingWorker, I want to make sure this operates off the previous view mode
-		 * in the event filterForViewMode is called before the current worker completes.
+		/*
+		  I'm utilizing SwingWorker here because it seems like less of a headache
+		  to use over Thread.
+		  <br>
+		  Because of SwingWorker, I want to make sure this operates off the previous view mode
+		  in the event filterForViewMode is called before the current worker completes.
+		  <br>
+		  I don't actually know if this would do anything, but I'm making an educated guess until
+		  I take the time to use my google-fu to clarify.
 		 */
 		final int localViewMode = viewMode;
 		SwingWorker worker = new SwingWorker ( ) {
@@ -490,7 +536,7 @@ public class DriveRootTree extends BetterTree {
 	 * @version 0.1
 	 * @since 0.1
 	 */
-	private void updateSelectedViewmode ( BRTNode selectedNode ) {
+	private void updateSelectedVisibleNodes ( BRTNode selectedNode ) {
 		List<BRTNode> children = new ArrayList<> ( );
 		for ( int i = 0; i < selectedNode.getChildCount ( ); i++ ) {
 			children.add ( ( BRTNode ) selectedNode.getChildAt ( i ) );
@@ -516,12 +562,11 @@ public class DriveRootTree extends BetterTree {
 	/**
 	 * Updates all the unselected expanded paths.
 	 *
-	 * @TODO: Optimize and refactor. I think this is in a good spot right now but would love for some to chime in.
+	 * @TODO: Optimize and refactor. I think this is in a good spot right now but would love for some one to chime in.
 	 */
-	private synchronized void updateUnselectedViewMode ( ) {
+	private synchronized void updateUnselectedVisibleNodes ( ) {
 
 		for ( TreePath p : expandedPaths ) {
-			System.out.println ( p );
 			for ( int i = 0; i < p.getPathCount ( ); i++ ) {
 				List<BRTNode> children = new ArrayList<> ( );
 				BRTNode n = ( BRTNode ) p.getPathComponent ( i );
@@ -559,9 +604,32 @@ public class DriveRootTree extends BetterTree {
 	}
 
 	/**
+	 * Starts the update process when the view mode or show hidden criteria has changed.
+	 */
+	private void startViewUpdate ( ) {
+		TreePath path = getSelectionPath ( );
+
+		if ( path != null ) {
+			BRTNode node = ( BRTNode ) path.getLastPathComponent ( );
+			if ( node != null ) {
+				INodeObject obj = node.getNodeObject ( );
+
+				//Make sure the last path node isn't the root node.
+				if ( !( obj instanceof PCNodeObject ) ) {
+					updateSelectedVisibleNodes ( node );
+				}
+			}
+		}
+
+		//Now we can do the unselected nodes.
+		updateUnselectedVisibleNodes ( );
+	}
+
+	/**
 	 * Gets the selection path(s) before reloading the model and then expands the path
 	 * again. This is so when node changes occur we can keep the selection paths expanded.
 	 *
+	 * @TODO: Change the reload call to only reload change nodes, not the entire model.
 	 * @version 0.1
 	 * @since 0.1
 	 */
@@ -574,6 +642,17 @@ public class DriveRootTree extends BetterTree {
 				expandPath ( p );
 			}
 		}
+	}
+
+	/**
+	 * Fires the double click event for the attached double click listener.
+	 */
+	private void fireDoubleClickEvent ( ) {
+		Point mp = MouseInfo.getPointerInfo ( ).getLocation ( );
+		Point cp = getLocationOnScreen ( );
+		MouseEvent event = new MouseEvent ( this , MouseEvent.MOUSE_PRESSED , System.currentTimeMillis ( ) , 0 , mp.x - cp.x , mp.y - cp.y , 2 , false );
+
+		doubleClickListener.mousePressed ( event );
 	}
 
 	/**
@@ -617,6 +696,31 @@ public class DriveRootTree extends BetterTree {
 	}
 
 	/**
+	 * Overridden to aid in the custom expansion/collapse process.
+	 * <br>
+	 * The super tree has its toggle count set to 0 no matter what since we handle the click count
+	 * in DriveRootTree.
+	 *
+	 * @param clickCount the number of mouse clicks to get a node expanded or closed
+	 */
+	@Override
+	public void setToggleClickCount ( int clickCount ) {
+		super.setToggleClickCount ( 0 );
+	}
+
+	/**
+	 * Overridden to prevent editing of cells, until a custom implementation can be created.
+	 *
+	 * @param flag a boolean value, true if the tree is editable
+	 *
+	 * @TODO: Editing a cell renames the file.
+	 */
+	@Override
+	public void setEditable ( boolean flag ) {
+		super.setEditable ( false );
+	}
+
+	/**
 	 * Sets the popup menu on right click for the RootTree.
 	 *
 	 * @param popup - the popup that will be assigned to this component
@@ -653,26 +757,40 @@ public class DriveRootTree extends BetterTree {
 		}
 	}
 
+	/**
+	 * Sets the mouse adapter that should receive double click events from the tree.
+	 * This could be used for automatically retrieving the currently selected file, for example.
+	 *
+	 * @param adapter
+	 *
+	 * @apiNote Currently only mousePressed events are fired. This can be expanded in the future if needed.
+	 */
+	public void setDoubleClickListener ( MouseAdapter adapter ) {
+		this.doubleClickListener = adapter;
+	}
+
 
 	/**
 	 * Sets the text of the top node of the Tree.
 	 *
-	 * @apiNote Not currently working
 	 * @param text
 	 *
+	 * @apiNote Not currently working
 	 * @version 0.1
 	 * @since 0.1
 	 */
 	public void setTopRootText ( final String text ) {
-		topRootNode.setUserObject ( new PCNodeObject ( text , getSystemFileIcon ( getDesktopFile ( ) ) ) );
+		BRTNode node = (BRTNode ) currentModel.getRoot ( );
+		node.setUserObject ( new PCNodeObject ( text , getSystemFileIcon ( getDesktopFile ( ) ) ) );
 
-		currentModel.nodeChanged ( topRootNode );
+		currentModel.reload ( node );
 	}
 
 	/**
 	 * Sets the icon for the top root node.
 	 *
 	 * @param icon
+	 *
 	 * @apiNote Not currently working
 	 * @version 0.1
 	 * @since 0.1
@@ -686,7 +804,7 @@ public class DriveRootTree extends BetterTree {
 	/**
 	 * Sets the view mode of the JTree.
 	 * <br>
-	 * The options are FOLDERS_ONLY (-1) and FOLDERS_AND_FILES (0)..
+	 * The options are FOLDERS_ONLY (-1) and FOLDERS_AND_FILES (0).
 	 *
 	 * @param viewMode
 	 *
@@ -697,22 +815,7 @@ public class DriveRootTree extends BetterTree {
 		this.viewMode = viewMode;
 		registry.addTreeInt ( Keys.treeViewModeKey , viewMode );
 
-		TreePath path = getSelectionPath ( );
-
-		if ( path != null ) {
-			BRTNode node = ( BRTNode ) path.getLastPathComponent ( );
-			if ( node != null ) {
-				INodeObject obj = node.getNodeObject ( );
-
-				//Make sure the last path node isn't the root node.
-				if ( !( obj instanceof PCNodeObject ) ) {
-					updateSelectedViewmode ( node );
-				}
-			}
-		}
-
-		//Node we can do the unselected nodes.
-		updateUnselectedViewMode ( );
+		startViewUpdate ( );
 	}
 
 	/**
@@ -727,20 +830,55 @@ public class DriveRootTree extends BetterTree {
 		this.showHidden = showHidden;
 		registry.addTreeBoolean ( Keys.treeShowHiddenKey , showHidden );
 
+		startViewUpdate ( );
 	}
 
 	/**
-	 * @param expandable
+	 * <p>
+	 * Sets if the trees nodes can be expanded. If collapseNow is set to true, all
+	 * currently expanded paths will be collapsed and if unloadCollapsed is set to true
+	 * all nodes with children will have their children unloaded.
+	 * </p>
+	 * <p>
+	 * The expandedPaths list will be cleared as well, as there will be no paths expanded to track.
+	 * All caches will be cleared as well.
+	 * </p>
+	 *
+	 * @param expandable  If nodes containing children should be allowed to expand.
+	 * @param collapseNow if all the currently expanded nodes should be collapsed.
 	 */
-	public void setExpandable ( boolean expandable ) {
+	public void setExpandable ( boolean expandable , boolean collapseNow ) {
 		this.expandable = expandable;
+
+		if ( collapseNow ) {
+			for ( TreePath p : expandedPaths ) {
+				collapsePath ( p );
+			}
+		}
 	}
 
 	/**
-	 * @param unload
+	 * <p>
+	 * Sets if nodes containing children should have their children removed when the parent
+	 * is collapsed.
+	 * </p>
+	 * <p>
+	 * No cache maps will be cleared.
+	 * </p>
+	 * @param unload If nodes that are collapsed should have their children removed.
 	 */
 	public void setUnloadOnCollapse ( boolean unload ) {
 		this.unloadCollapsed = unload;
+	}
+
+	/**
+	 * Sets if right click events should select paths just like left clicks in the
+	 * event the tree popup menu has not been assigned. If the menu has been assigned, right
+	 * click selecting paths is the default behavior.
+	 * @param selects
+	 */
+	public void setRightClickSelects ( boolean selects ) {
+		this.rightClickSelects = selects;
 	}
 }
 

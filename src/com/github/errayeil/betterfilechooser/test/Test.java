@@ -27,6 +27,7 @@ public class Test {
 
 		button.addActionListener ( (a) -> {
 			tree.setViewMode ( DriveRootTree.FOLDERS_AND_FILES );
+			tree.setShowHidden ( true );
 		} );
 
 		PanelMatic.begin ( contentPane )
@@ -41,6 +42,6 @@ public class Test {
 		dialog.pack ();
 		dialog.setVisible ( true );
 
-		tree.setTopRootText ( "Testing" );
+		tree.setTopRootText ( "testing" );
 	}
 }

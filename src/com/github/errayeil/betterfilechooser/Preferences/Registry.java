@@ -64,7 +64,7 @@ public final class Registry implements PreferenceChangeListener {
 		public static final String treeViewModeKey = "Tree.viewMode";
 		public static final String treeSortKey = "Tree.activeSort";
 		public static final String treeFilterKey = "Tree.activeFilter";
-		public static final String treeAutoExpandKEy = "Tree.autoExpand";
+		public static final String treeAutoExpandKey = "Tree.autoExpand";
 
 		public static final String rTreeDesktopKey = "RTree.showDesktop";
 		public static final String rTreeHideDriveKey = "RTree.hideDrive";
