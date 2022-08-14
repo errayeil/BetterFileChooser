@@ -7,7 +7,7 @@ The goals of BetterFileChooser is to:
   - Each custom component is usable separately from the BetterFileChooser class.
 - Extend the capabilities of file choosing UI.
 - Provide a means to keep certain data consistent accross instances of BetterFileChooser. For example: 
-  - The BetterFileChooser dialog and currently selected directory will be remembered and re-applied when it is used again.
+  - The BetterFileChooser dialog position, size, and currently selected directory will be remembered and re-applied when it is used again.
     - This can be shut off , if required.
 - In the end with everything above included, a useful, fluid, and functional interface for the end-user.
 
