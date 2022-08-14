@@ -3,7 +3,10 @@ package com.github.errayeil.betterfilechooser.ui.tree.Root.Objects;
 import com.github.errayeil.betterfilechooser.Utils.BetterFileUtils;
 
 import javax.swing.Icon;
+import javax.swing.ImageIcon;
 import java.io.File;
+
+import static com.github.errayeil.betterfilechooser.Utils.Resources.getLoadingIcon;
 
 /**
  * @author Errayeil
@@ -20,12 +23,22 @@ public final class DriveNodeObject implements INodeObject {
 	/**
 	 *
 	 */
-	private final String driveText;
+	private String driveText;
 
 	/**
 	 *
 	 */
-	private final Icon driveIcon;
+	private Icon displayedIcon;
+
+	/**
+	 *
+	 */
+	private Icon retrievedIcon;
+
+	/**
+	 *
+	 */
+	private final ImageIcon loadingIcon;
 
 	/**
 	 *
@@ -45,7 +58,9 @@ public final class DriveNodeObject implements INodeObject {
 	public DriveNodeObject ( File driveFile , String driveText, Icon icon) {
 		this.driveFile = driveFile;
 		this.driveText = driveText;
-		this.driveIcon = icon;
+		this.retrievedIcon = icon;
+		this.loadingIcon = getLoadingIcon();
+		displayedIcon = icon;
 	}
 
 	/**
@@ -64,8 +79,8 @@ public final class DriveNodeObject implements INodeObject {
 	 * @return
 	 */
 	@Override
-	public Icon getIcon ( ) {
-		return driveIcon;
+	public Icon icon ( ) {
+		return displayedIcon;
 	}
 
 	/**
@@ -76,6 +91,29 @@ public final class DriveNodeObject implements INodeObject {
 	@Override
 	public File getFile ( ) {
 		return driveFile;
+	}
+
+	/**
+	 *
+	 * @param loading
+	 */
+	@Override
+	public void setNodeIsLoading ( boolean loading ) {
+		if ( loading ) {
+			displayedIcon = loadingIcon;
+		} else {
+			displayedIcon = retrievedIcon;
+		}
+	}
+
+	@Override
+	public void setText ( String text ) {
+		driveText = text;
+	}
+
+	@Override
+	public void setIcon ( Icon icon ) {
+		retrievedIcon = icon;
 	}
 
 	/**

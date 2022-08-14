@@ -2,11 +2,9 @@ package com.github.errayeil.betterfilechooser.ui.tree.Root;
 
 import com.github.errayeil.betterfilechooser.Preferences.Registry;
 import com.github.errayeil.betterfilechooser.Preferences.Registry.Keys;
+import com.github.errayeil.betterfilechooser.ui.Listener.ClickListener;
 import com.github.errayeil.betterfilechooser.ui.tree.BetterTree;
-import com.github.errayeil.betterfilechooser.ui.tree.Root.Objects.DriveNodeObject;
-import com.github.errayeil.betterfilechooser.ui.tree.Root.Objects.FileNodeObject;
-import com.github.errayeil.betterfilechooser.ui.tree.Root.Objects.INodeObject;
-import com.github.errayeil.betterfilechooser.ui.tree.Root.Objects.PCNodeObject;
+import com.github.errayeil.betterfilechooser.ui.tree.Root.Objects.*;
 
 import javax.swing.Icon;
 import javax.swing.JPopupMenu;
@@ -33,9 +31,8 @@ import static com.github.errayeil.betterfilechooser.Utils.BetterFileUtils.*;
  *
  * @author Errayeil
  * @version 0.1
- * @TODO: Loading icon that appears in the Tree cell label when updating the view mode or opening a directory with a lot
- * of files that can slow down the createChildren function. I wanted to utilize Lottie Framework, but unfortunately that
- * is not available for Java, yet. It'll probably end up being gif images.
+ * @TODO Provide ability to set custom loading icon
+ * @TODO Provide ability to set custom icons for nodes
  * @since 0.1
  */
 public class DriveRootTree extends BetterTree {
@@ -117,7 +114,7 @@ public class DriveRootTree extends BetterTree {
 	private MouseListener popupListener;
 
 	/**
-	 *
+	 * The mouse listener that is sent events on double click.
 	 */
 	private MouseListener doubleClickListener;
 
@@ -144,22 +141,16 @@ public class DriveRootTree extends BetterTree {
 	private boolean showHidden;
 
 	/**
-	 * The click count needed to expand a selected path.
-	 */
-	private int toggleClickCount = 1;
-
-	/**
 	 * Boolean flag to determine if the desktop path should be displayed in the tree.
-	 * By default, this is false.
 	 */
-	private boolean showDesktopFolder = false;
+	private boolean showDesktopFolder;
 
 	/**
 	 * Boolean flag to determine if an expansion events should be carried out.
 	 * If set to false, this essentially makes the RootTree as a shortcut medium
-	 * for the storage drives. This is by default set to true.
+	 * for the storage drives.
 	 */
-	private boolean allowExpansion = true;
+	private boolean allowExpansion;
 
 	/**
 	 * Boolean flag to determine if a nodes children should be removed when
@@ -187,9 +178,10 @@ public class DriveRootTree extends BetterTree {
 	 * visibility to the provided parameters.
 	 */
 	public DriveRootTree ( ) {
-		this.viewMode = -1; //registry.getTreeInt ( Keys.treeViewModeKey );
+		this.viewMode = 0; //registry.getTreeInt ( Keys.treeViewModeKey );
 		this.showHidden = false; //registry.getTreeBoolean ( Keys.treeShowHiddenKey );
-		this.showDesktopFolder = false ;//registry.getTreeBoolean ( Keys.rTreeShowDesktopKey );
+		this.showDesktopFolder = false;//registry.getTreeBoolean ( Keys.rTreeShowDesktopKey );
+		this.allowExpansion = true; //registry.getTreeBoolean ( Keys.rTreeAllowExpansionKey );
 
 		topRootNode = new BRTNode ( new PCNodeObject ( "This PC" , getSystemFileIcon ( getDesktopFile ( ) ) ) );
 		currentModel = new DefaultTreeModel ( topRootNode );
@@ -201,7 +193,6 @@ public class DriveRootTree extends BetterTree {
 
 		for ( Path p : listDeviceRoots ( ) ) {
 			File f = p.toFile ( );
-
 			DriveNodeObject dn = new DriveNodeObject ( f , getSystemDisplayName ( f ) , getSystemFileIcon ( f ) );
 			driveNodesList.add ( new BRTNode ( dn ) );
 		}
@@ -230,10 +221,17 @@ public class DriveRootTree extends BetterTree {
 	 * @since 0.1
 	 */
 	private void setupListeners ( ) {
+		/*
+		 * Implements a custom mouse listener to differentiate being single or double clicks.
+		 * Because of the way this is handled, this can add a noticeable delay since it utilizes
+		 * the OS double-click speed property. The slower that property is set to the greater
+		 * the delay.
+		 * @TODO: See if I can improve the delay somehow.
+		 */
+		addMouseListener ( new ClickListener ( ) {
 
-		addMouseListener ( new MouseAdapter ( ) {
 			@Override
-			public void mousePressed ( MouseEvent e ) {
+			public void singleClick ( MouseEvent e ) {
 				TreePath path = getPathForLocation ( e.getX ( ) , e.getY ( ) );
 
 				if ( SwingUtilities.isLeftMouseButton ( e ) ) {
@@ -241,24 +239,24 @@ public class DriveRootTree extends BetterTree {
 						setSelectionPath ( path );
 					}
 
-					//TODO: Need to come up with some way to avoid executing single click code
-					if ( e.getClickCount ( ) == 2 ) {
-						if ( doubleClickListener != null ) {
-							fireDoubleClickEvent ( );
-						}
-						return;
-					}
-					if ( e.getClickCount ( ) == 1  ) {
-						if ( DriveRootTree.this.allowExpansion ) {
-							if ( path != null ) {
-								BRTNode node = ( BRTNode ) path.getLastPathComponent ( );
+					if ( DriveRootTree.this.allowExpansion ) {
+						if ( path != null ) {
+							BRTNode node = ( BRTNode ) path.getLastPathComponent ( );
+							if ( !isExpanded ( path )) {
 								if ( node != null ) {
 									INodeObject obj = node.getNodeObject ( );
 
 									if ( !( obj instanceof PCNodeObject ) ) {
 										selectedFile = node.getNodeObject ( ).getFile ( );
 										selectedNode = node;
-										createChildren ( node , selectedFile );
+
+										SwingUtilities.invokeLater ( () -> {
+											obj.setNodeIsLoading ( true );
+											selectedNode.setUserObject ( obj );
+											currentModel.nodeChanged ( selectedNode );
+										} );
+
+										createChildren ( selectedNode , obj.getFile ( ) );
 									}
 								}
 							}
@@ -278,6 +276,16 @@ public class DriveRootTree extends BetterTree {
 					}
 				}
 			}
+
+			@Override
+			public void doubleClick ( MouseEvent e ) {
+				if ( SwingUtilities.isLeftMouseButton ( e ) ) {
+					if ( doubleClickListener != null ) {
+						fireDoubleClickEvent ( );
+					}
+				}
+			}
+
 		} );
 
 		/**
@@ -384,6 +392,7 @@ public class DriveRootTree extends BetterTree {
 	 * @since 0.1
 	 */
 	private void createChildren ( BRTNode parentNode , File directory ) {
+		INodeObject obj = parentNode.getNodeObject ();
 		List<BRTNode> childNodes = new ArrayList<> ( );
 
 		SwingWorker worker = new SwingWorker ( ) {
@@ -413,6 +422,9 @@ public class DriveRootTree extends BetterTree {
 				}
 
 				expandPath ( getSelectionPath ( ) );
+				obj.setNodeIsLoading ( false );
+				parentNode.setUserObject ( obj );
+				currentModel.nodeChanged ( parentNode );
 			}
 		};
 
@@ -669,16 +681,14 @@ public class DriveRootTree extends BetterTree {
 	}
 
 	/**
-	 *
 	 * @return
 	 */
 	@Override
 	public JPopupMenu getComponentPopupMenu ( ) {
-		return getTreePopup ();
+		return getTreePopup ( );
 	}
 
 	/**
-	 *
 	 * @return
 	 */
 	public MouseListener getDoubleClickListener ( ) {
@@ -686,7 +696,6 @@ public class DriveRootTree extends BetterTree {
 	}
 
 	/**
-	 *
 	 * @return
 	 */
 	public JPopupMenu getTreePopup ( ) {
@@ -712,7 +721,26 @@ public class DriveRootTree extends BetterTree {
 	 *
 	 * @return
 	 */
-	public int getCurrentViewMode( ) {
+	public String getRootText ( ) {
+		return topRootNode.getNodeObject ().getText ();
+	}
+
+	/**
+	 * Returns a list of the drives currently visible in the three.
+	 */
+	public List<File> getListedDrives ( ) {
+		List<File> roots = new ArrayList<> (  );
+		for (BRTNode n : driveNodesList ) {
+			roots.add ( n.getNodeObject ().getFile () );
+		}
+		return roots;
+	}
+
+
+	/**
+	 * @return
+	 */
+	public int getCurrentViewMode ( ) {
 		return viewMode;
 	}
 
@@ -742,7 +770,6 @@ public class DriveRootTree extends BetterTree {
 	}
 
 	/**
-	 *
 	 * @return
 	 */
 	public boolean isShowingHidden ( ) {
@@ -750,7 +777,6 @@ public class DriveRootTree extends BetterTree {
 	}
 
 	/**
-	 *
 	 * @return
 	 */
 	public boolean isRightClickSelectEnabled ( ) {
@@ -758,7 +784,6 @@ public class DriveRootTree extends BetterTree {
 	}
 
 	/**
-	 *
 	 * @return
 	 */
 	public boolean isShowingDesktopFolder ( ) {
@@ -850,10 +875,12 @@ public class DriveRootTree extends BetterTree {
 	 * @since 0.1
 	 */
 	public void setTopRootText ( final String text ) {
-		BRTNode node = ( BRTNode ) currentModel.getRoot ( );
-		node.setUserObject ( new PCNodeObject ( text , getSystemFileIcon ( getDesktopFile ( ) ) ) );
-
-		currentModel.reload ( node );
+		SwingUtilities.invokeLater ( () -> {
+			INodeObject obj = topRootNode.getNodeObject ();
+			obj.setText ( text );
+			topRootNode.setUserObject ( obj );
+			currentModel.nodeChanged ( topRootNode );
+		} );
 	}
 
 	/**
@@ -866,9 +893,76 @@ public class DriveRootTree extends BetterTree {
 	 * @since 0.1
 	 */
 	public void setTopRootIcon ( final Icon icon ) {
-		PCNodeObject object = ( PCNodeObject ) topRootNode.getNodeObject ( );
-		topRootNode.setUserObject ( new PCNodeObject ( object.getText ( ) , icon ) );
-		reloadAndExpand ( );
+		SwingUtilities.invokeLater ( () -> {
+			PCNodeObject object = ( PCNodeObject ) topRootNode.getNodeObject ( );
+			topRootNode.setUserObject ( new PCNodeObject ( object.getText ( ) , icon ) );
+			currentModel.nodeChanged ( topRootNode );
+		} );
+	}
+
+	/**
+	 * Sets the loading icon.
+	 *
+	 * @apiNote Not functional yet
+	 * @param icon
+	 */
+	public void setLoadingIcon ( final Icon icon ) {
+
+	}
+
+	/**
+	 * Sets the icon that should be displayed on the drive nodes.
+	 * @apiNote Not functional yet
+	 * @param icon
+	 */
+	public void setDriveIcon ( final Icon icon ) {
+
+	}
+
+	/**
+	 * Sets the icon for the specific drive provided, provided the drive
+	 * is visible within the tree.
+	 *
+	 * @apiNote Not functional yet
+	 * @param icon
+	 * @param drive
+	 */
+	public void setDriveIcon ( final Icon icon , File drive ) {
+
+	}
+
+	/**
+	 * Sets the icon that should be displayed on folder tree nodes.
+	 *
+	 * @apiNote Not functional yet
+	 * @param icon
+	 */
+	public void setFolderIcon ( final Icon icon ) {
+
+	}
+
+	/**
+	 * Sets the icon for the specified folder. For example, this could be
+	 * the desktop folder.
+	 *
+	 * @apiNote Not Functional yet
+	 * @param icon
+	 * @param folder
+	 */
+	public void setFolderIcon (final Icon icon , File folder ) {
+
+	}
+
+	/**
+	 * Sets the icon for files with the provided extension.
+	 * This is useful for if you want to use your own icons for the tree.
+	 *
+	 * @apiNote Not functional yet
+	 * @param extension
+	 * @param icon
+	 */
+	public void setFileIcon ( final Icon icon , final String extension ) {
+
 	}
 
 	/**
@@ -904,6 +998,21 @@ public class DriveRootTree extends BetterTree {
 	}
 
 	/**
+	 * Sets the showHidden flag and viewMode to the specified values.
+	 *
+	 * @param showHidden
+	 * @param viewMode
+	 */
+	public void setHiddenAndViewMode ( boolean showHidden , int viewMode ) {
+		this.showHidden = showHidden;
+		this.viewMode = viewMode;
+		registry.addTreeBoolean ( Keys.treeShowHiddenKey , showHidden );
+		registry.addTreeInt ( Keys.treeViewModeKey, viewMode );
+
+		startViewUpdate ();
+	}
+
+	/**
 	 * Sets if the desktop folder should be visible.
 	 *
 	 * @param showDesktop
@@ -912,18 +1021,20 @@ public class DriveRootTree extends BetterTree {
 		this.showDesktopFolder = showDesktop;
 		registry.addTreeBoolean ( Keys.rTreeShowDesktopKey , showDesktop );
 
-		if ( showDesktop ) {
-			BRTNode node = ( BRTNode ) topRootNode.getChildAt ( 0 );
+		SwingUtilities.invokeLater ( ( ) -> {
+			if ( showDesktop ) {
+				BRTNode node = ( BRTNode ) topRootNode.getChildAt ( 0 );
 
-			if ( !node.getNodeObject ( ).getText ( ).equals ( "Desktop" ) ) {
-				topRootNode.insert ( new BRTNode ( new FileNodeObject ( getDesktopFile ( ) , getSystemFileIcon ( getDesktopFile ( ) ) ) ) , 0 );
+				if ( !node.getNodeObject ( ).getText ( ).equals ( "Desktop" ) ) {
+					topRootNode.insert ( new BRTNode ( new FileNodeObject ( getDesktopFile ( ) , getSystemFileIcon ( getDesktopFile ( ) ) ) ) , 0 );
+				}
+
+			} else {
+				topRootNode.remove ( 0 );
 			}
 
-		} else {
-			topRootNode.remove ( 0 );
-		}
-
-		currentModel.reload ( topRootNode );
+			currentModel.reload ( topRootNode );
+		} );
 	}
 
 	/**
@@ -943,11 +1054,13 @@ public class DriveRootTree extends BetterTree {
 	public void setExpandable ( boolean expandable , boolean collapseNow ) {
 		this.allowExpansion = expandable;
 
-		if ( collapseNow ) {
-			for ( TreePath p : expandedPaths ) {
-				collapsePath ( p );
+		SwingUtilities.invokeLater ( ( ) -> {
+			if ( collapseNow ) {
+				for ( TreePath p : expandedPaths ) {
+					collapsePath ( p );
+				}
 			}
-		}
+		} );
 	}
 
 	/**

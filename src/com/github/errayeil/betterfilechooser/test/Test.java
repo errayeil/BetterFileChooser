@@ -34,6 +34,10 @@ public class Test {
 		menu.add ( new JMenuItem ( "I loved you, you were my brother!" ) );
 		menu.add ( new JMenuItem ( "It goes something like that... I can't remember the lines exactly." ) );
 
+		button.addActionListener ( (a) -> {
+			tree.setTopRootText ( "Text" );
+		} );
+
 		tree.setComponentPopupMenu ( menu );
 
 		tree.setDoubleClickListener ( new MouseAdapter ( ) {

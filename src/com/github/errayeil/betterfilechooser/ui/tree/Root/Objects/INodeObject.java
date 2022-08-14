@@ -32,21 +32,37 @@ public interface INodeObject {
 	 * @apiNote This can be null. You should test for null when using the result.
 	 * This also depends on the subclass implementation.
 	 */
-	Icon getIcon ( );
+	Icon icon ( );
 
 	/**
 	 * <p>
 	 * Returns the file assigned to this NodeObject.
 	 * This is utilized by the BRTCellRenderer.
 	 * </p>
+	 *
 	 * @apiNote This can be null. You should test for null when using the result.
 	 * This also depends on the subclass implementation.
 	 */
 	File getFile ( );
 
 	/**
-	 * Returns the NodeType.
 	 *
+	 */
+	void setNodeIsLoading ( boolean loading );
+
+	/**
+	 * @param text
+	 */
+	void setText ( String text );
+
+	/**
+	 *
+	 * @param icon
+	 */
+	void setIcon ( Icon icon );
+
+	/**
+	 * Returns the NodeType.
 	 *
 	 * @see NodeType
 	 */

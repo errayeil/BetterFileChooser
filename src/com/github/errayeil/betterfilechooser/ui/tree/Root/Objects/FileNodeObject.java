@@ -3,7 +3,10 @@ package com.github.errayeil.betterfilechooser.ui.tree.Root.Objects;
 import com.github.errayeil.betterfilechooser.Utils.BetterFileUtils;
 
 import javax.swing.Icon;
+import javax.swing.ImageIcon;
 import java.io.File;
+
+import static com.github.errayeil.betterfilechooser.Utils.Resources.getLoadingIcon;
 
 /**
  * @author Errayeil
@@ -25,7 +28,17 @@ public class FileNodeObject implements INodeObject {
 	/**
 	 *
 	 */
-	private final Icon icon;
+	private Icon displayedIcon;
+
+	/**
+	 *
+	 */
+	private Icon retrievedIcon;
+
+	/**
+	 *
+	 */
+	private ImageIcon loadingIcon;
 
 	/**
 	 *
@@ -35,13 +48,21 @@ public class FileNodeObject implements INodeObject {
 		this ( file , BetterFileUtils.getSystemFileIcon ( file ) );
 	}
 
+	/**
+	 *
+	 * @param file
+	 * @param icon
+	 */
 	public FileNodeObject ( final File file , final Icon icon) {
 		this.file = file;
-		this.icon = icon;
+		this.retrievedIcon = icon;
+		this.loadingIcon = getLoadingIcon();
 
 		if (file != null) {
 			name = file.getName ();
 		}
+
+		displayedIcon = icon;
 	}
 
 	/**
@@ -58,13 +79,36 @@ public class FileNodeObject implements INodeObject {
 	 * @return
 	 */
 	@Override
-	public Icon getIcon ( ) {
-		return icon;
+	public Icon icon ( ) {
+		return displayedIcon;
 	}
 
 	@Override
 	public File getFile ( ) {
 		return file;
+	}
+
+	/**
+	 *
+	 * @param loading
+	 */
+	@Override
+	public void setNodeIsLoading ( boolean loading ) {
+		if ( loading ) {
+			displayedIcon = loadingIcon;
+		} else {
+			displayedIcon = retrievedIcon;
+		}
+	}
+
+	@Override
+	public void setText ( String text ) {
+		this.name = text;
+	}
+
+	@Override
+	public void setIcon ( Icon icon ) {
+		this.retrievedIcon = icon;
 	}
 
 	@Override

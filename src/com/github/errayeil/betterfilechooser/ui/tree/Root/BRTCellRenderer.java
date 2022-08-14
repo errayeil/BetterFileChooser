@@ -5,9 +5,7 @@ import io.codeworth.panelmatic.PanelMatic;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultTreeCellRenderer;
-import java.awt.Color;
 import java.awt.Component;
-import java.io.File;
 
 import static com.github.errayeil.betterfilechooser.Utils.BetterCompUtils.fill;
 
@@ -19,12 +17,29 @@ import static com.github.errayeil.betterfilechooser.Utils.BetterCompUtils.fill;
  */
 public class BRTCellRenderer extends DefaultTreeCellRenderer {
 
+	/**
+	 *
+	 */
+	private JPanel panel;
+
+	/**
+	 *
+	 */
+	private JLabel cellLabel;
+
 
 	/**
 	 *
 	 */
 	public BRTCellRenderer () {
+		panel = new JPanel (  );
+		cellLabel = new JLabel (  );
 
+		panel.setOpaque ( false );
+		PanelMatic.begin ( panel )
+				.add ( fill ( 0 , 0 ) )
+				.add ( cellLabel )
+				.get ( );
 	}
 
 	/**
@@ -40,23 +55,11 @@ public class BRTCellRenderer extends DefaultTreeCellRenderer {
 	 */
 	@Override
 	public Component getTreeCellRendererComponent ( JTree tree , Object value , boolean sel , boolean expanded , boolean leaf , int row , boolean hasFocus ) {
-		JPanel panel = new JPanel (  );
-		JLabel cellLabel = new JLabel (  );
-
 		if ( value instanceof BRTNode node ) {
-			final INodeObject no = node.getNodeObject ();
-			File f = no.getFile ();
-
-			cellLabel.setText ( no.getText () );
-			cellLabel.setIcon ( no.getIcon () );
+			INodeObject obj = node.getNodeObject ();
+			cellLabel.setText ( obj.getText () );
+			cellLabel.setIcon ( obj.icon () );
 		}
-
-		panel.setOpaque ( false );
-
-		PanelMatic.begin ( panel )
-				.add ( fill ( 0 , 0) )
-				.add ( cellLabel )
-				.get (  );
 
 		return panel;
 	}

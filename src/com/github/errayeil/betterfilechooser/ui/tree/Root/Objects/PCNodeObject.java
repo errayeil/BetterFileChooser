@@ -4,50 +4,53 @@ import javax.swing.Icon;
 import java.io.File;
 
 /**
+ * @param text
+ * @param icon
+ *
  * @author Errayeil
  * @version 0.1
  * @since 0.1
  */
-public final class PCNodeObject implements INodeObject {
+public class PCNodeObject implements INodeObject {
 
 	/**
 	 *
 	 */
-	private final String text;
+	private String text;
 
 	/**
 	 *
 	 */
-	private final Icon icon;
+	private Icon icon;
 
 	/**
-	 *
 	 * @param text
 	 */
-	public PCNodeObject ( final String text , Icon icon) {
+	public PCNodeObject (String text , Icon icon) {
 		this.text = text;
 		this.icon = icon;
 	}
 
 	/**
-	 *
 	 * @return
 	 */
+	@Override
 	public String getText ( ) {
 		return text;
 	}
 
 	/**
-	 *
 	 * @return
 	 */
-	public Icon getIcon ( ) {
+	@Override
+	public Icon icon ( ) {
 		return icon;
 	}
 
 	/**
 	 * Returns this node objects file.
 	 * In the case of PCNodeObject, this returns null.
+	 *
 	 * @return
 	 */
 	@Override
@@ -55,8 +58,24 @@ public final class PCNodeObject implements INodeObject {
 		return null;
 	}
 
+	@Override
+	public void setNodeIsLoading ( boolean loading ) {
+
+	}
+
+	@Override
+	public void setText ( String text ) {
+		this.text = text;
+	}
+
+	@Override
+	public void setIcon ( Icon icon ) {
+		this.icon = icon;
+	}
+
 	/**
 	 * Returns the node type.
+	 *
 	 * @return
 	 */
 	@Override
@@ -66,6 +85,7 @@ public final class PCNodeObject implements INodeObject {
 
 	/**
 	 * Returns the text described in this NodeObject.
+	 *
 	 * @return
 	 */
 	@Override
