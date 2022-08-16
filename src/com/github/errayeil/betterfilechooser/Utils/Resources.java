@@ -1,7 +1,5 @@
 package com.github.errayeil.betterfilechooser.Utils;
 
-import com.github.errayeil.betterfilechooser.ui.tree.Root.Objects.BRTCell;
-
 import javax.swing.ImageIcon;
 import java.util.Objects;
 

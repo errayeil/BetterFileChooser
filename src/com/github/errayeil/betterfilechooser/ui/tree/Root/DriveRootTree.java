@@ -2,9 +2,15 @@ package com.github.errayeil.betterfilechooser.ui.tree.Root;
 
 import com.github.errayeil.betterfilechooser.Preferences.Registry;
 import com.github.errayeil.betterfilechooser.Preferences.Registry.Keys;
+import com.github.errayeil.betterfilechooser.Utils.Resources;
 import com.github.errayeil.betterfilechooser.ui.Listener.ClickListener;
+import com.github.errayeil.betterfilechooser.ui.tree.Abstract.FileComm;
+import com.github.errayeil.betterfilechooser.ui.tree.Abstract.FileNodeResource;
 import com.github.errayeil.betterfilechooser.ui.tree.BetterTree;
-import com.github.errayeil.betterfilechooser.ui.tree.Root.Objects.*;
+import org.apache.commons.io.FilenameUtils;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 import javax.swing.Icon;
 import javax.swing.JPopupMenu;
@@ -21,6 +27,7 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.io.File;
 import java.nio.file.Path;
+import java.security.InvalidParameterException;
 import java.util.*;
 
 import static com.github.errayeil.betterfilechooser.Utils.BetterFileUtils.*;
@@ -35,7 +42,7 @@ import static com.github.errayeil.betterfilechooser.Utils.BetterFileUtils.*;
  * @TODO Provide ability to set custom icons for nodes
  * @since 0.1
  */
-public class DriveRootTree extends BetterTree {
+public class DriveRootTree extends BetterTree implements FileComm {
 
 	/**
 	 * Preferences wrapper class that stores data such was BetterFileChooser dialog location and
@@ -92,6 +99,32 @@ public class DriveRootTree extends BetterTree {
 	private final Map<BRTNode, List<BRTNode>> cachedNodes;
 
 	/**
+	 * <p>
+	 * A map containing icons that should be used for specific
+	 * extensions. If this map does not contain an extension for a
+	 * file the default system icon will be used..
+	 * </p>
+	 * <br>
+	 * Key: File extension
+	 * <br>
+	 * Value: The icon used for the extension.
+	 */
+	private final Map<String, Icon> fileIcons;
+
+	/**
+	 * <p>
+	 * A map containing icons that should be used for specific folders.
+	 * If this map does not contain an icon for a folder the default
+	 * system icon will be used.
+	 * </p>
+	 * <br>
+	 * Key: The file that will use the custom Icon.
+	 * <br>
+	 * Value: The icon for the folder.
+	 */
+	private final Map<File, Icon> folderIcons;
+
+	/**
 	 * A set of currently expanded paths. Any new path that is added
 	 * that has its parent path currently in this set will override
 	 * the parent path.
@@ -109,14 +142,35 @@ public class DriveRootTree extends BetterTree {
 	private JPopupMenu treePopup;
 
 	/**
-	 * The current mouse listener for the popup menu.
-	 */
-	private MouseListener popupListener;
-
-	/**
 	 * The mouse listener that is sent events on double click.
 	 */
 	private MouseListener doubleClickListener;
+
+	/**
+	 * The icon used when the tree is loading
+	 * a selected node's children.
+	 */
+	private Icon loadingIcon;
+
+	/**
+	 * The icon that is used for the root node.
+	 */
+	private Icon rootIcon;
+
+	/**
+	 * The icon that is used for the desktop node.
+	 */
+	private Icon desktopIcon;
+
+	/**
+	 * The icon that is used for drive nodes.
+	 */
+	private Icon driveIcon;
+
+	/**
+	 * The icon that is used for folder nodes.
+	 */
+	private Icon folderIcon;
 
 	/**
 	 * The currently selected node.
@@ -172,6 +226,11 @@ public class DriveRootTree extends BetterTree {
 	public static int FOLDERS_ONLY = -1;
 	public static int FOLDERS_AND_FILES = 0;
 
+	/**
+	 *
+	 */
+	private BRTNodeType nodeTypes;
+
 
 	/**
 	 * Constructs a RootTree with the default roots and sets the view mode and hidden file
@@ -183,22 +242,32 @@ public class DriveRootTree extends BetterTree {
 		this.showDesktopFolder = false;//registry.getTreeBoolean ( Keys.rTreeShowDesktopKey );
 		this.allowExpansion = true; //registry.getTreeBoolean ( Keys.rTreeAllowExpansionKey );
 
-		topRootNode = new BRTNode ( new PCNodeObject ( "This PC" , getSystemFileIcon ( getDesktopFile ( ) ) ) );
+		topRootNode = new BRTNode ( new BRTNodeResource ( "This PC" , getSystemFileIcon ( getDesktopFile ( ) ) , BRTNodeType.ROOT_NODE ) );
 		currentModel = new DefaultTreeModel ( topRootNode );
 		driveNodesList = new ArrayList<> ( );
 		hiddenNodes = new HashMap<> ( );
 		dsNodes = new HashMap<> ( );
 		cachedNodes = new HashMap<> ( );
+		fileIcons = new HashMap<> ( );
+		folderIcons = new HashMap<> ( );
 		expandedPaths = new HashSet<> ( );
+
+		this.rootIcon = getSystemFileIcon ( getDesktopFile ( ) );
+		this.desktopIcon = rootIcon;
 
 		for ( Path p : listDeviceRoots ( ) ) {
 			File f = p.toFile ( );
-			DriveNodeObject dn = new DriveNodeObject ( f , getSystemDisplayName ( f ) , getSystemFileIcon ( f ) );
-			driveNodesList.add ( new BRTNode ( dn ) );
+
+			if ( driveIcon == null ) {
+				driveIcon = getSystemFileIcon ( f );
+			}
+
+			BRTNodeResource res = new BRTNodeResource ( f , getSystemDisplayName ( f ) , driveIcon , BRTNodeType.DRIVE_NODE );
+			driveNodesList.add ( new BRTNode ( res ) );
 		}
 
 		if ( showDesktopFolder ) {
-			topRootNode.add ( new BRTNode ( new FileNodeObject ( getDesktopFile ( ) , getSystemFileIcon ( getDesktopFile ( ) ) ) ) );
+			topRootNode.add ( new BRTNode ( new BRTNodeResource ( getDesktopFile ( ) , "Desktop" , rootIcon , BRTNodeType.DESKTOP_NODE ) ) );
 		}
 
 		for ( BRTNode n : driveNodesList ) {
@@ -242,21 +311,23 @@ public class DriveRootTree extends BetterTree {
 					if ( DriveRootTree.this.allowExpansion ) {
 						if ( path != null ) {
 							BRTNode node = ( BRTNode ) path.getLastPathComponent ( );
-							if ( !isExpanded ( path )) {
+							if ( !isExpanded ( path ) ) {
 								if ( node != null ) {
-									INodeObject obj = node.getNodeObject ( );
+									FileNodeResource res = node.getNodeResource ( );
 
-									if ( !( obj instanceof PCNodeObject ) ) {
-										selectedFile = node.getNodeObject ( ).getFile ( );
+									if ( !res.getNodeType ( ).equals ( "ROOT" ) ) {
+										selectedFile = node.getNodeResource ( ).getFile ( );
 										selectedNode = node;
+										folderIcon = getSystemFileIcon ( selectedFile );
 
-										SwingUtilities.invokeLater ( () -> {
-											obj.setNodeIsLoading ( true );
-											selectedNode.setUserObject ( obj );
+										SwingUtilities.invokeLater ( ( ) -> {
+
+											res.setIcon ( Resources.getLoadingIcon ( ) );
+											selectedNode.setUserObject ( res );
 											currentModel.nodeChanged ( selectedNode );
 										} );
 
-										createChildren ( selectedNode , obj.getFile ( ) );
+										createChildren ( selectedNode , res.getFile ( ) );
 									}
 								}
 							}
@@ -265,12 +336,18 @@ public class DriveRootTree extends BetterTree {
 				} else if ( SwingUtilities.isRightMouseButton ( e ) ) {
 					if ( treePopup != null ) {
 						if ( path != null ) {
-							setSelectionPath ( path );
+							SwingUtilities.invokeLater ( ( ) -> {
+								setSelectionPath ( path );
+								//TODO fix popup showing before path selection
+								treePopup.show ( DriveRootTree.this , e.getX ( ) , e.getY ( ) );
+							} );
 						}
 					} else {
 						if ( rightClickSelect ) {
 							if ( path != null ) {
-								setSelectionPath ( path );
+								SwingUtilities.invokeLater ( ( ) -> {
+									setSelectionPath ( path );
+								} );
 							}
 						}
 					}
@@ -346,7 +423,7 @@ public class DriveRootTree extends BetterTree {
 	 * @version 0.1
 	 * @since 0.1
 	 */
-	private synchronized void removeChildren ( final BRTNode parentNode ) {
+	private synchronized void removeChildren ( @NotNull final BRTNode parentNode ) {
 		SwingWorker removeWorker = new SwingWorker ( ) {
 
 			/**
@@ -391,11 +468,12 @@ public class DriveRootTree extends BetterTree {
 	 * @version 0.1
 	 * @since 0.1
 	 */
-	private void createChildren ( BRTNode parentNode , File directory ) {
-		INodeObject obj = parentNode.getNodeObject ();
+	private void createChildren ( @NotNull BRTNode parentNode , @NotNull File directory ) {
+		FileNodeResource res = parentNode.getNodeResource ( );
 		List<BRTNode> childNodes = new ArrayList<> ( );
 
 		SwingWorker worker = new SwingWorker ( ) {
+
 			@Override
 			protected Object doInBackground ( ) throws Exception {
 				if ( directory != null && directory.isDirectory ( ) ) {
@@ -403,8 +481,7 @@ public class DriveRootTree extends BetterTree {
 
 					if ( files != null ) {
 						for ( File f : files ) {
-							BRTNode childNode = new BRTNode ( new FileNodeObject ( f ) );
-
+							BRTNode childNode = new BRTNode ( new BRTNodeResource ( f , getSystemDisplayName ( f ) , getFileIcon ( f ) , BRTNodeType.FILE_NODE ) );
 							childNodes.add ( childNode );
 						}
 					}
@@ -422,8 +499,9 @@ public class DriveRootTree extends BetterTree {
 				}
 
 				expandPath ( getSelectionPath ( ) );
-				obj.setNodeIsLoading ( false );
-				parentNode.setUserObject ( obj );
+
+				res.setIcon ( getFileIcon ( res.getFile ( ) ) );
+				parentNode.setUserObject ( res );
 				currentModel.nodeChanged ( parentNode );
 			}
 		};
@@ -440,10 +518,10 @@ public class DriveRootTree extends BetterTree {
 	 * @TODO: Provide the ability to set custom sorters.
 	 * @since 0.1
 	 */
-	private synchronized void sortChildren ( List<BRTNode> children ) {
+	private synchronized void sortChildren ( @NotNull List<BRTNode> children ) {
 		children.sort ( ( ( Comparator<BRTNode> ) ( o1 , o2 ) -> {
-			File f1 = o1.getNodeObject ( ).getFile ( );
-			File f2 = o2.getNodeObject ( ).getFile ( );
+			File f1 = o1.getNodeResource ( ).getFile ( );
+			File f2 = o2.getNodeResource ( ).getFile ( );
 
 			if ( f1.isDirectory ( ) && f2.isFile ( ) ) {
 				return -1;
@@ -455,8 +533,8 @@ public class DriveRootTree extends BetterTree {
 
 			return 1;
 		} ).thenComparing ( ( o1 , o2 ) -> {
-			File f1 = o1.getNodeObject ( ).getFile ( );
-			File f2 = o2.getNodeObject ( ).getFile ( );
+			File f1 = o1.getNodeResource ( ).getFile ( );
+			File f2 = o2.getNodeResource ( ).getFile ( );
 
 			return String.CASE_INSENSITIVE_ORDER.compare ( f1.getName ( ) , f2.getName ( ) );
 		} ) );
@@ -480,10 +558,10 @@ public class DriveRootTree extends BetterTree {
 	 * @version 0.1
 	 * @since 0.1
 	 */
-	private synchronized void filterChildren ( BRTNode parentNode , List<BRTNode> childNodes ) {
+	private synchronized void filterChildren ( @NotNull BRTNode parentNode , @NotNull List<BRTNode> childNodes ) {
 		List<BRTNode> toRemove = new ArrayList<> ( );
 		for ( BRTNode n : childNodes ) {
-			File f = n.getNodeObject ( ).getFile ( );
+			File f = n.getNodeResource ( ).getFile ( );
 
 			if ( f != null ) {
 				if ( !f.getAbsolutePath ( ).contains ( "$" ) ) {
@@ -525,7 +603,7 @@ public class DriveRootTree extends BetterTree {
 			protected Object doInBackground ( ) throws Exception {
 
 				for ( BRTNode n : toRemove ) {
-					File f = n.getNodeObject ( ).getFile ( );
+					File f = n.getNodeResource ( ).getFile ( );
 
 					if ( f != null ) {
 						if ( f.getAbsolutePath ( ).equals ( "$" ) ) {
@@ -561,7 +639,7 @@ public class DriveRootTree extends BetterTree {
 	 * @version 0.1
 	 * @since 0.1
 	 */
-	private void updateSelectedVisibleNodes ( BRTNode selectedNode ) {
+	private void updateSelectedVisibleNodes ( @NotNull BRTNode selectedNode ) {
 		List<BRTNode> children = new ArrayList<> ( );
 		for ( int i = 0; i < selectedNode.getChildCount ( ); i++ ) {
 			children.add ( ( BRTNode ) selectedNode.getChildAt ( i ) );
@@ -596,8 +674,10 @@ public class DriveRootTree extends BetterTree {
 				List<BRTNode> children = new ArrayList<> ( );
 				BRTNode n = ( BRTNode ) p.getPathComponent ( i );
 
-				if ( !( n.getNodeObject ( ) instanceof PCNodeObject ) ) {
-					if ( !( n.getNodeObject ( ) instanceof DriveNodeObject ) ) {
+				if ( !n.getNodeResource ( ).getNodeType ( ).equals ( "ROOT" ) ) {
+
+					if ( !n.getNodeResource ( ).getNodeType ( ).equals ( "DRIVE" ) ) {
+
 						for ( int a = 0; a < n.getChildCount ( ); a++ ) {
 							children.add ( ( BRTNode ) n.getChildAt ( a ) );
 						}
@@ -637,10 +717,10 @@ public class DriveRootTree extends BetterTree {
 		if ( path != null ) {
 			BRTNode node = ( BRTNode ) path.getLastPathComponent ( );
 			if ( node != null ) {
-				INodeObject obj = node.getNodeObject ( );
+				FileNodeResource obj = node.getNodeResource ( );
 
 				//Make sure the last path node isn't the root node.
-				if ( !( obj instanceof PCNodeObject ) ) {
+				if ( node.getNodeResource ( ).getNodeType ( ).equals ( "ROOT" ) ) {
 					updateSelectedVisibleNodes ( node );
 				}
 			}
@@ -675,7 +755,13 @@ public class DriveRootTree extends BetterTree {
 	private void fireDoubleClickEvent ( ) {
 		Point mp = MouseInfo.getPointerInfo ( ).getLocation ( );
 		Point cp = getLocationOnScreen ( );
-		MouseEvent event = new MouseEvent ( this , MouseEvent.MOUSE_PRESSED , System.currentTimeMillis ( ) , 0 , mp.x - cp.x , mp.y - cp.y , 2 , false );
+		MouseEvent event = new MouseEvent ( this ,
+				MouseEvent.MOUSE_PRESSED ,
+				System.currentTimeMillis ( ) ,
+				0 , mp.x - cp.x ,
+				mp.y - cp.y ,
+				2 ,
+				false );
 
 		doubleClickListener.mousePressed ( event );
 	}
@@ -685,7 +771,7 @@ public class DriveRootTree extends BetterTree {
 	 */
 	@Override
 	public JPopupMenu getComponentPopupMenu ( ) {
-		return getTreePopup ( );
+		return treePopup;
 	}
 
 	/**
@@ -695,12 +781,6 @@ public class DriveRootTree extends BetterTree {
 		return doubleClickListener;
 	}
 
-	/**
-	 * @return
-	 */
-	public JPopupMenu getTreePopup ( ) {
-		return treePopup;
-	}
 
 	/**
 	 * Returns the selected file in the RootTree.
@@ -713,25 +793,24 @@ public class DriveRootTree extends BetterTree {
 	 * @version 0.1
 	 * @since 0.1
 	 */
-	public File getSelectedFile ( ) {
+	public final File getSelectedFile ( ) {
 		return selectedFile;
 	}
 
 	/**
-	 *
 	 * @return
 	 */
-	public String getRootText ( ) {
-		return topRootNode.getNodeObject ().getText ();
+	public final String getRootText ( ) {
+		return topRootNode.getNodeResource ( ).getText ( );
 	}
 
 	/**
 	 * Returns a list of the drives currently visible in the three.
 	 */
-	public List<File> getListedDrives ( ) {
-		List<File> roots = new ArrayList<> (  );
-		for (BRTNode n : driveNodesList ) {
-			roots.add ( n.getNodeObject ().getFile () );
+	public final List<File> getListedDrives ( ) {
+		List<File> roots = new ArrayList<> ( );
+		for ( BRTNode n : driveNodesList ) {
+			roots.add ( n.getNodeResource ( ).getFile ( ) );
 		}
 		return roots;
 	}
@@ -740,7 +819,8 @@ public class DriveRootTree extends BetterTree {
 	/**
 	 * @return
 	 */
-	public int getCurrentViewMode ( ) {
+	public @Unmodifiable
+	final int getCurrentViewMode ( ) {
 		return viewMode;
 	}
 
@@ -816,39 +896,68 @@ public class DriveRootTree extends BetterTree {
 	}
 
 	/**
-	 * Sets the popup menu on right click for the RootTree.
-	 *
-	 * @param popup - the popup that will be assigned to this component
-	 *              If a null popup is assigned the previous assigned
-	 *              popup will be removed and its mouse adapter will be
-	 *              removed from the RootTree.
+	 * Does nothing, use setPopupMenu instead.
 	 *
 	 * @version 0.1
 	 * @since 0.1
 	 */
 	@Override
 	public void setComponentPopupMenu ( JPopupMenu popup ) {
-		if ( popup != null ) {
-			this.treePopup = popup;
-		} else {
-			if ( popupListener != null ) {
-				removeMouseListener ( popupListener );
-				popupListener = null;
-				return;
+
+	}
+
+	/**
+	 * @param file
+	 *
+	 * @return
+	 */
+	@Override
+	public @NotNull Icon getFileIcon ( @NotNull File file ) {
+
+		if ( file.isDirectory ( ) ) {
+			if ( folderIcons.containsKey ( file ) ) {
+				return folderIcons.get ( file );
+			}
+		} else if ( file.isFile ( ) ) {
+			if ( fileIcons.containsKey ( file ) ) {
+				return fileIcons.get ( file );
 			}
 		}
 
-		if ( popupListener == null ) {
-			popupListener = new MouseAdapter ( ) {
-				@Override
-				public void mouseClicked ( MouseEvent e ) {
-					if ( SwingUtilities.isRightMouseButton ( e ) ) {
-						if ( treePopup != null ) {
-							treePopup.show ( e.getComponent ( ) , e.getX ( ) , e.getY ( ) );
-						}
-					}
-				}
-			};
+
+		return getSystemFileIcon ( file );
+	}
+
+	/**
+	 * @param file
+	 *
+	 * @return
+	 */
+	@Override
+	public String getFileExtension ( File file ) {
+		//For now this will utilize Apache file utils, in the future I will migrate away from that.
+		return FilenameUtils.getExtension ( file.getName ( ) );
+	}
+
+	/**
+	 * @param file
+	 * @param includeAll
+	 *
+	 * @return
+	 */
+	@Override
+	public String getFileExtension ( File file , boolean includeAll ) {
+		return FilenameUtils.getExtension ( file.getName ( ) );
+	}
+
+	/**
+	 * @param popup
+	 */
+	public void setPopupMenu ( JPopupMenu popup ) {
+		if ( popup != null ) {
+			treePopup = popup;
+		} else {
+			treePopup = null;
 		}
 	}
 
@@ -875,8 +984,8 @@ public class DriveRootTree extends BetterTree {
 	 * @since 0.1
 	 */
 	public void setTopRootText ( final String text ) {
-		SwingUtilities.invokeLater ( () -> {
-			INodeObject obj = topRootNode.getNodeObject ();
+		SwingUtilities.invokeLater ( ( ) -> {
+			FileNodeResource obj = topRootNode.getNodeResource ( );
 			obj.setText ( text );
 			topRootNode.setUserObject ( obj );
 			currentModel.nodeChanged ( topRootNode );
@@ -892,10 +1001,11 @@ public class DriveRootTree extends BetterTree {
 	 * @version 0.1
 	 * @since 0.1
 	 */
-	public void setTopRootIcon ( final Icon icon ) {
-		SwingUtilities.invokeLater ( () -> {
-			PCNodeObject object = ( PCNodeObject ) topRootNode.getNodeObject ( );
-			topRootNode.setUserObject ( new PCNodeObject ( object.getText ( ) , icon ) );
+	public void setTopRootIcon ( @NotNull final Icon icon ) {
+		SwingUtilities.invokeLater ( ( ) -> {
+			BRTNodeResource res = ( BRTNodeResource ) topRootNode.getNodeResource ( );
+			res.setIcon ( icon );
+			topRootNode.setUserObject ( res );
 			currentModel.nodeChanged ( topRootNode );
 		} );
 	}
@@ -903,66 +1013,208 @@ public class DriveRootTree extends BetterTree {
 	/**
 	 * Sets the loading icon.
 	 *
-	 * @apiNote Not functional yet
 	 * @param icon
+	 *
+	 * @apiNote Not functional yet
 	 */
-	public void setLoadingIcon ( final Icon icon ) {
-
+	public void setLoadingIcon ( @NotNull final Icon icon ) {
+		this.loadingIcon = icon;
 	}
 
 	/**
 	 * Sets the icon that should be displayed on the drive nodes.
-	 * @apiNote Not functional yet
+	 *
 	 * @param icon
+	 *
+	 * @apiNote Not functional yet
 	 */
-	public void setDriveIcon ( final Icon icon ) {
+	public void setDriveIcon ( @NotNull final Icon icon ) {
+		this.driveIcon = icon;
 
+		for ( int i = 0; i < topRootNode.getChildCount ( ); i++ ) {
+			BRTNode node = ( BRTNode ) topRootNode.getChildAt ( i );
+			BRTNodeResource res = ( BRTNodeResource ) node.getNodeResource ( );
+
+			if ( res.getNodeType ( ).equals ( "DRIVE" ) ) {
+				res.setIcon ( icon );
+				node.setUserObject ( res );
+				SwingUtilities.invokeLater ( ( ) -> {
+					currentModel.nodeChanged ( node );
+				} );
+			}
+		}
 	}
 
 	/**
 	 * Sets the icon for the specific drive provided, provided the drive
 	 * is visible within the tree.
 	 *
-	 * @apiNote Not functional yet
 	 * @param icon
-	 * @param drive
+	 * @param driveFile
+	 *
+	 * @apiNote Not functional yet
 	 */
-	public void setDriveIcon ( final Icon icon , File drive ) {
+	public void setDriveIcon ( @NotNull final Icon icon , @NotNull File driveFile ) {
+		this.driveIcon = icon;
 
+		for ( int i = 0; i < topRootNode.getChildCount ( ); i++ ) {
+			BRTNode node = ( BRTNode ) topRootNode.getChildAt ( i );
+			BRTNodeResource res = ( BRTNodeResource ) topRootNode.getChildAt ( i );
+
+			if ( res.getNodeType ( ).equals ( "DRIVE" ) ) {
+				File nodeFile = res.getFile ( );
+
+				if ( nodeFile != null ) {
+					if ( nodeFile == driveFile ) {
+						res.setIcon ( icon );
+						node.setUserObject ( res );
+						currentModel.nodeChanged ( node );
+						break; //Break the loop early
+					}
+				}
+			}
+		}
 	}
 
 	/**
-	 * Sets the icon that should be displayed on folder tree nodes.
+	 * Sets the icon that should be displayed on folder tree nodes, going forward..
+	 *
+	 * @param icon
 	 *
 	 * @apiNote Not functional yet
-	 * @param icon
 	 */
-	public void setFolderIcon ( final Icon icon ) {
-
+	public void setFolderIcon ( @NotNull final Icon icon ) {
+		this.folderIcon = icon;
 	}
 
 	/**
 	 * Sets the icon for the specified folder. For example, this could be
-	 * the desktop folder.
+	 * the desktop folder. This will update that folder immediately.
 	 *
-	 * @apiNote Not Functional yet
 	 * @param icon
 	 * @param folder
+	 *
+	 * @apiNote Not Functional yet
 	 */
-	public void setFolderIcon (final Icon icon , File folder ) {
+	public void setFolderIcon ( @NotNull final Icon icon , @NotNull File folder ) {
+		folderIcons.put ( folder , icon );
 
+		SwingWorker worker = new SwingWorker ( ) {
+
+			BRTNode node;
+
+			@Override
+			protected Object doInBackground ( ) throws Exception {
+				node = crawl ( topRootNode );
+
+				return null;
+			}
+
+			@Override
+			protected void done ( ) {
+				if ( node != null ) {
+					FileNodeResource res = node.getNodeResource ( );
+					res.setIcon ( icon );
+
+					node.setUserObject ( res );
+					currentModel.nodeChanged ( node );
+				}
+			}
+
+			/**
+			 * Crawls the tree for a node that represents the provided folder.
+			 * If one is not found, this returns null. If this returns null then that folder
+			 * is not yet visible in the tree.
+			 * @param parent
+			 * @return Returns the BRTNode needed, if it is not found this will return null.
+			 */
+			private @Nullable BRTNode crawl ( @NotNull BRTNode parent ) {
+				int count = parent.getChildCount ( );
+
+				if ( count > 0 ) { //Quick check to make sure it has children
+					for ( int i = 0; i < count; i++ ) {
+						BRTNode child = ( BRTNode ) parent.getChildAt ( i );
+						FileNodeResource res = child.getNodeResource ( );
+						File resFile = res.getFile ( );
+
+						if ( resFile == folder ) {
+							return child;
+						} else {
+							crawl ( child );
+						}
+					}
+				}
+
+				return null;
+			}
+		};
+
+		worker.execute ( );
 	}
 
 	/**
-	 * Sets the icon for files with the provided extension.
+	 * Sets the icon for files with the provided extension. This will
+	 * update all currently loaded file nodes.
 	 * This is useful for if you want to use your own icons for the tree.
 	 *
-	 * @apiNote Not functional yet
 	 * @param extension
 	 * @param icon
 	 */
-	public void setFileIcon ( final Icon icon , final String extension ) {
+	public void setFileIcon ( @NotNull final Icon icon , @NotNull final String extension ) {
+		fileIcons.put ( extension , icon );
 
+		SwingWorker worker = new SwingWorker ( ) {
+
+			List<BRTNode> nodes;
+
+			@Override
+			protected Object doInBackground ( ) throws Exception {
+				nodes = crawl ( topRootNode );
+
+				return null;
+			}
+
+			@Override
+			protected void done ( ) {
+				for ( BRTNode n : nodes ) {
+					FileNodeResource res = n.getNodeResource ( );
+					res.setIcon ( icon );
+					currentModel.nodeChanged ( n );
+				}
+			}
+
+			/**
+			 * Crawls the tree for nodes that contains the provided extension.
+			 * @param parent
+			 * @return Returns a list of BRTNodes that should be updated.
+			 */
+			private @NotNull List<BRTNode> crawl ( BRTNode parent ) {
+				int count = parent.getChildCount ( );
+				List<BRTNode> nodesToUpdate = new ArrayList<> ( );
+
+				if ( count > 0 ) { //Quick check to make sure it has children, it should, but yanno, why not?
+					for ( int i = 0; i < count; i++ ) {
+						BRTNode child = ( BRTNode ) parent.getChildAt ( i );
+						FileNodeResource res = child.getNodeResource ( );
+						File resFile = res.getFile ( );
+
+						if ( resFile.isFile ( ) ) {
+							String ext = getFileExtension ( resFile );
+
+							if ( ext.equals ( extension ) ) {
+								nodesToUpdate.add ( child );
+							}
+						} else if ( resFile.isDirectory ( ) ) {
+							crawl ( child );
+						}
+					}
+				}
+
+				return nodesToUpdate;
+			}
+		};
+
+		worker.execute ( );
 	}
 
 	/**
@@ -976,10 +1228,14 @@ public class DriveRootTree extends BetterTree {
 	 * @since 0.1
 	 */
 	public void setViewMode ( int viewMode ) {
-		this.viewMode = viewMode;
-		registry.addTreeInt ( Keys.treeViewModeKey , viewMode );
+		if ( viewMode == -1 || viewMode == 0 ) {
+			throw new InvalidParameterException ( "Integer provided is not a valid view mode code." );
+		} else {
+			this.viewMode = viewMode;
+			registry.addTreeInt ( Keys.treeViewModeKey , viewMode );
 
-		startViewUpdate ( );
+			startViewUpdate ( );
+		}
 	}
 
 	/**
@@ -1004,12 +1260,16 @@ public class DriveRootTree extends BetterTree {
 	 * @param viewMode
 	 */
 	public void setHiddenAndViewMode ( boolean showHidden , int viewMode ) {
+		if ( viewMode == -1 || viewMode == 0 ) {
+			throw new InvalidParameterException ( "Integer provided is not a valid view mode code." );
+		}
+
 		this.showHidden = showHidden;
 		this.viewMode = viewMode;
 		registry.addTreeBoolean ( Keys.treeShowHiddenKey , showHidden );
-		registry.addTreeInt ( Keys.treeViewModeKey, viewMode );
+		registry.addTreeInt ( Keys.treeViewModeKey , viewMode );
 
-		startViewUpdate ();
+		startViewUpdate ( );
 	}
 
 	/**
@@ -1025,8 +1285,8 @@ public class DriveRootTree extends BetterTree {
 			if ( showDesktop ) {
 				BRTNode node = ( BRTNode ) topRootNode.getChildAt ( 0 );
 
-				if ( !node.getNodeObject ( ).getText ( ).equals ( "Desktop" ) ) {
-					topRootNode.insert ( new BRTNode ( new FileNodeObject ( getDesktopFile ( ) , getSystemFileIcon ( getDesktopFile ( ) ) ) ) , 0 );
+				if ( !node.getNodeResource ( ).getNodeType ( ).equals ( "DESKTOP" ) ) {
+					topRootNode.insert ( new BRTNode ( new BRTNodeResource ( getDesktopFile ( ) , "Desktop" , getSystemFileIcon ( getDesktopFile ( ) ) , BRTNodeType.DESKTOP_NODE ) ) , 0 );
 				}
 
 			} else {

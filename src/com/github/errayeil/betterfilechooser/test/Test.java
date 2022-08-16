@@ -38,7 +38,7 @@ public class Test {
 			tree.setTopRootText ( "Text" );
 		} );
 
-		tree.setComponentPopupMenu ( menu );
+		tree.setPopupMenu ( menu );
 
 		tree.setDoubleClickListener ( new MouseAdapter ( ) {
 			@Override

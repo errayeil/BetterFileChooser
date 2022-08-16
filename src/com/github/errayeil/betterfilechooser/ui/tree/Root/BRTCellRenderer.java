@@ -1,6 +1,6 @@
 package com.github.errayeil.betterfilechooser.ui.tree.Root;
 
-import com.github.errayeil.betterfilechooser.ui.tree.Root.Objects.INodeObject;
+import com.github.errayeil.betterfilechooser.ui.tree.Abstract.FileNodeResource;
 import io.codeworth.panelmatic.PanelMatic;
 
 import javax.swing.*;
@@ -56,9 +56,9 @@ public class BRTCellRenderer extends DefaultTreeCellRenderer {
 	@Override
 	public Component getTreeCellRendererComponent ( JTree tree , Object value , boolean sel , boolean expanded , boolean leaf , int row , boolean hasFocus ) {
 		if ( value instanceof BRTNode node ) {
-			INodeObject obj = node.getNodeObject ();
+			FileNodeResource obj = node.getNodeResource ();
 			cellLabel.setText ( obj.getText () );
-			cellLabel.setIcon ( obj.icon () );
+			cellLabel.setIcon ( obj.getIcon () );
 		}
 
 		return panel;

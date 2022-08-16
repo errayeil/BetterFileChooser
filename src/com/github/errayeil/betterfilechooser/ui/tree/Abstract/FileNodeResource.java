@@ -1,4 +1,6 @@
-package com.github.errayeil.betterfilechooser.ui.tree.Root.Objects;
+package com.github.errayeil.betterfilechooser.ui.tree.Abstract;
+
+import com.github.errayeil.betterfilechooser.ui.tree.Root.BRTNodeType;
 
 import javax.swing.Icon;
 import java.io.File;
@@ -10,7 +12,7 @@ import java.io.File;
  * @version 0.1
  * @since 0.1
  */
-public interface INodeObject {
+public interface FileNodeResource {
 
 	/**
 	 * <p>
@@ -32,7 +34,7 @@ public interface INodeObject {
 	 * @apiNote This can be null. You should test for null when using the result.
 	 * This also depends on the subclass implementation.
 	 */
-	Icon icon ( );
+	Icon getIcon ( );
 
 	/**
 	 * <p>
@@ -45,10 +47,6 @@ public interface INodeObject {
 	 */
 	File getFile ( );
 
-	/**
-	 *
-	 */
-	void setNodeIsLoading ( boolean loading );
 
 	/**
 	 * @param text
@@ -64,7 +62,7 @@ public interface INodeObject {
 	/**
 	 * Returns the NodeType.
 	 *
-	 * @see NodeType
+	 * @see BRTNodeType
 	 */
-	NodeType getNodeType ( );
+	String getNodeType ( );
 }
