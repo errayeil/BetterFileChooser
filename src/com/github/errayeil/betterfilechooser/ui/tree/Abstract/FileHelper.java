@@ -11,21 +11,21 @@ import java.io.File;
  * @version 0.1
  * @since 0.1
  */
-public interface FileComm {
+public interface FileHelper {
 
 	/**
 	 * Gets the file Icon.
-	 * @param file
+	 * @param filePath
 	 * @return
 	 */
-	Icon getFileIcon ( File file );
+	Icon getIcon ( String filePath );
 
 	/**
 	 * Attempts to retrieve the extension of the provided file.
 	 * @param file
 	 * @return
 	 */
-	String getFileExtension ( File file );
+	String getExtension ( File file );
 
 	/**
 	 * Attempts to retrieve the extension of the provided file.
@@ -35,5 +35,5 @@ public interface FileComm {
 	 * @param includeAll
 	 * @return
 	 */
-	String getFileExtension ( File file , boolean includeAll );
+	String getExtension ( File file , boolean includeAll );
 }

@@ -132,4 +132,11 @@ public class BetterFileUtils {
 		return FileSystemView.getFileSystemView ( ).getSystemIcon ( file );
 	}
 
+	/**
+	 *
+	 * @return
+	 */
+	public static Icon getSystemDriveIcon ( ) {
+		return FileSystemView.getFileSystemView ().getSystemIcon ( listDeviceRoots ().get ( 0 ).toFile () );
+	}
 }

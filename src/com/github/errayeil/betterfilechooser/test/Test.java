@@ -8,6 +8,8 @@ import javax.swing.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
+import static com.github.errayeil.betterfilechooser.Utils.BetterFileUtils.listDeviceRoots;
+
 /**
  * @author Errayeil
  * @version 0.1
@@ -24,7 +26,7 @@ public class Test {
 
 		JDialog dialog = new JDialog (  );
 		JPanel contentPane = new JPanel (  );
-		DriveRootTree tree = new DriveRootTree ( );
+		DriveRootTree tree = new DriveRootTree ( listDeviceRoots());
 		JButton button = new JButton ( "HIT ME TO TEST MOTHER FUCKER" );
 		JPopupMenu menu = new JPopupMenu (  );
 
